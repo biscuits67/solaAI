@@ -112,11 +112,6 @@ export function WelcomeModal() {
     setWelcomeOpen(false)
     tutorial()
   }
-  const goReal = () => {
-    setMode('real')
-    setWelcomeOpen(false)
-    tutorial()
-  }
 
   return (
     <AnimatePresence>
@@ -201,9 +196,7 @@ export function WelcomeModal() {
                     <button className="btn btn-ghost" onClick={stayDemo}>
                       Stay in Demo
                     </button>
-                    <button className="btn btn-primary" disabled={!agree} onClick={goReal}>
-                      Switch to Real
-                    </button>
+                    <button className="btn btn-primary">Connect</button>
                   </div>
                 </motion.div>
               )}
