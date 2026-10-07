@@ -1,33 +1,32 @@
-# Sola AI — нейросетевой терминал для торговли Solana
+# Solana AI — neural trading terminal for SOL
 
-Стеклянный премиальный терминал SOL/USDT: живые котировки с централизованных бирж, AI-ансамбль сигналов, прогноз цены, копилот, автопилот и бэктест.
+A glass, AI-first trading terminal for SOL/USDT: live CEX market data, a 9-expert AI ensemble you can watch think in real time, price forecasts, an autonomous AI trading bot, a chat copilot and a backtester.
 
-## Запуск
+## Run
 
 ```bash
-npm install
+npm install      # on Windows PowerShell use: npm.cmd install
 npm run dev      # http://localhost:5173
-npm run build    # production-сборка в dist/
+npm run build    # production build in dist/
 ```
 
-## Что внутри
+## Screens
 
-| Раздел | Возможности |
+| Tab | What it shows |
 | --- | --- |
-| **Терминал** | Свечной график (EMA, Боллинджер, AI-прогноз, уровни S/R, AI-сигналы, позиции, панели AI score и RSI), стакан, лента сделок, глубина рынка, сравнение цен на 5 биржах, ордер-панель |
-| **AI-аналитика** | Спидометр AI score, уверенность, голоса 9 экспертов, радар, конус прогноза, ключевые уровни, комментарий модели, чат-копилот с командами («купи на 200$ x3», «закрой все») |
-| **Автопилот** | 4 стратегии (Нейро-ансамбль, Trend Rider, Mean Reversion, Breakout Scout), параметры риска, журнал решений |
-| **Бэктест** | Прогон стратегии по 1000 свечам: доходность, просадка, win rate, profit factor, сделки на графике, кривая капитала |
-| **Портфель** | Капитал, распределение, PnL по источникам, тепловая карта PnL |
+| **AI Brain** | Live neural network visualisation (9 experts → hidden layer → output), 5-stage reasoning pipeline, AI signal gauge & confidence, chart with AI forecast cone / levels / signal markers, live **AI thought stream**, AI trading bot control, forecast, demo equity, chat copilot |
+| **Trades** | Equity KPIs, positions / orders / history, manual order panel, PnL by source, PnL heatmap, cross-exchange prices |
+| **Backtest** | Replay any of 4 strategies over up to 1000 candles with equity curve, trade markers and stats |
 
-### Режимы
-- **Демо** — 10 000 USDT виртуально, реальные цены: лонг/шорт, плечо до x20, рыночные и лимитные ордера, TP/SL, ликвидация, комиссии. Сохраняется в `localStorage`.
-- **Реал** — кнопка «Подключить кошелёк» и окно выбора кошелька (Phantom, Solflare, Backpack, Ledger), без логики.
+## Modes
+- On every visit a welcome modal says you are in **Demo** mode and lets you pick Demo or Real.
+- **Demo** — $10,000 virtual balance on live prices; the AI bot, copilot and manual trading are fully functional.
+- **Real** — shows a warning that the AI bot trades only with wallets holding **at least $50**, then a *Connect wallet* flow (UI only, no wallet logic yet).
 
-### Данные
-WebSocket и REST API Binance → Bybit → OKX с автоматическим переключением. Если все биржи недоступны из сети, включается офлайн-симулятор рынка (с предупреждением в интерфейсе).
+## Data
+WebSocket + REST from Binance → Bybit → OKX with automatic fallback. If no exchange is reachable, an offline market simulator kicks in (a banner says so).
 
-### Стек
-Vite + React + TypeScript, lightweight-charts, framer-motion, zustand. Шрифты Unbounded / Onest / JetBrains Mono. Без SVG: иконки и логотипы сделаны на CSS, графики — canvas.
+## Stack
+Vite, React, TypeScript, lightweight-charts, framer-motion, zustand. Fonts: Unbounded / Onest / JetBrains Mono. No SVG — icons and logo are CSS, visualisations are canvas.
 
-> Сигналы модели — вероятностная оценка, а не финансовая рекомендация.
+> AI signals are probabilistic estimates, not financial advice.

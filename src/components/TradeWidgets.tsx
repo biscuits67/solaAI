@@ -1,120 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { loadQuotes, type Quote } from '../data/exchanges'
-import { fmtCompact, fmtDuration, fmtPct, fmtPrice, fmtSigned, fmtTime, fmtUsd } from '../lib/format'
+import { fmtDuration, fmtPct, fmtPrice, fmtSigned, fmtUsd } from '../lib/format'
 import { useMarket } from '../store/market'
 import { useSignal } from '../store/signal'
 import { liqPrice, upnl, useTrading, type Position, type Side } from '../store/trading'
 import { useUI } from '../store/ui'
-import { DepthChart, Pressure } from './canvas'
 import { NumInput, Range, Segmented } from './Controls'
 import { Panel } from './Glass'
-
-/* ───────────── Order book ───────────── */
-
-export function OrderBookPanel({ delay = 0 }: { delay?: number }) {
-  const book = useMarket((s) => s.book)
-  const price = useMarket((s) => s.price)
-  const lastDir = useMarket((s) => s.lastDir)
-  const rows = 11
-  const asks = book?.asks.slice(0, rows) ?? []
-  const bids = book?.bids.slice(0, rows) ?? []
-  const max = Math.max(...asks.map((l) => l.size), ...bids.map((l) => l.size), 1)
-  const bidSum = bids.reduce((s, l) => s + l.size, 0)
-  const askSum = asks.reduce((s, l) => s + l.size, 0)
-  const spread = asks[0] && bids[0] ? asks[0].price - bids[0].price : 0
-  return (
-    <Panel title="Стакан" k="L2" delay={delay} right={<span className="dim mono" style={{ fontSize: 11 }}>спред {spread.toFixed(3)}</span>}>
-      <div className="book">
-        <div className="book-head">
-          <span>Цена</span>
-          <span>SOL</span>
-          <span>Сумма $</span>
-        </div>
-        {!book &&
-          Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" style={{ height: 16, margin: '4px 8px' }} />)}
-        {[...asks].reverse().map((l, i) => (
-          <div key={'a' + i} className="book-row ask">
-            <span className="down">{fmtPrice(l.price)}</span>
-            <span>{l.size.toFixed(2)}</span>
-            <span className="dim">{fmtCompact(l.price * l.size)}</span>
-            <div className="bar" style={{ width: `${(l.size / max) * 100}%` }} />
-          </div>
-        ))}
-        <div className="book-mid">
-          <span className={`mono ${lastDir > 0 ? 'up' : lastDir < 0 ? 'down' : ''}`} style={{ fontSize: 17, fontWeight: 600 }}>
-            {fmtPrice(price)}
-          </span>
-          <span className="dim" style={{ fontSize: 11 }}>
-            {lastDir > 0 ? '▲' : lastDir < 0 ? '▼' : '•'} последняя
-          </span>
-        </div>
-        {bids.map((l, i) => (
-          <div key={'b' + i} className="book-row bid">
-            <span className="up">{fmtPrice(l.price)}</span>
-            <span>{l.size.toFixed(2)}</span>
-            <span className="dim">{fmtCompact(l.price * l.size)}</span>
-            <div className="bar" style={{ width: `${(l.size / max) * 100}%` }} />
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }} className="mono">
-          <span className="up">B {Math.round((bidSum / (bidSum + askSum || 1)) * 100)}%</span>
-          <span className="down">{Math.round((askSum / (bidSum + askSum || 1)) * 100)}% A</span>
-        </div>
-        <Pressure buy={bidSum / (bidSum + askSum || 1)} height={6} />
-      </div>
-    </Panel>
-  )
-}
-
-export function DepthPanel({ delay = 0 }: { delay?: number }) {
-  const book = useMarket((s) => s.book)
-  return (
-    <Panel title="Глубина рынка" k="Depth" delay={delay}>
-      {book ? <DepthChart bids={book.bids} asks={book.asks} height={170} /> : <div className="skeleton" style={{ height: 170 }} />}
-    </Panel>
-  )
-}
-
-/* ───────────── Trades tape ───────────── */
-
-export function TradesPanel({ delay = 0 }: { delay?: number }) {
-  const trades = useMarket((s) => s.trades)
-  const avg = useMemo(() => trades.reduce((s, t) => s + t.size, 0) / (trades.length || 1), [trades])
-  const buys = trades.filter((t) => t.side === 'buy').reduce((s, t) => s + t.size, 0)
-  const sells = trades.filter((t) => t.side === 'sell').reduce((s, t) => s + t.size, 0)
-  return (
-    <Panel title="Лента сделок" k="Live" delay={delay}>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }} className="mono">
-          <span className="up">Покупки {buys.toFixed(1)}</span>
-          <span className="down">{sells.toFixed(1)} Продажи</span>
-        </div>
-        <Pressure buy={buys / (buys + sells || 1)} height={6} />
-      </div>
-      <div style={{ height: 330, overflow: 'hidden', maskImage: 'linear-gradient(#000 80%, transparent)', WebkitMaskImage: 'linear-gradient(#000 80%, transparent)' }}>
-        {!trades.length && <div className="empty">Ожидание сделок…</div>}
-        <AnimatePresence initial={false}>
-          {trades.slice(0, 22).map((t) => (
-            <motion.div
-              key={t.id}
-              className={`tape-row ${t.size > avg * 3 ? 'big' : ''}`}
-              initial={{ opacity: 0, x: t.side === 'buy' ? -16 : 16, backgroundColor: t.side === 'buy' ? 'rgba(47,243,179,0.18)' : 'rgba(255,79,128,0.18)' }}
-              animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(0,0,0,0)' }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <span className={t.side === 'buy' ? 'up' : 'down'}>{fmtPrice(t.price)}</span>
-              <span>{t.size.toFixed(3)}</span>
-              <span>{fmtTime(t.time)}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-    </Panel>
-  )
-}
 
 /* ───────────── Trade panel ───────────── */
 
@@ -169,12 +62,12 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
 
   return (
     <Panel
-      title="Ордер"
+      title="Manual order"
       k={mode === 'demo' ? 'DEMO' : 'REAL'}
       delay={delay}
       right={
         <button className="btn btn-ghost btn-xs" onClick={applyAI} disabled={!signal}>
-          ✦ AI-план
+          ✦ Use AI plan
         </button>
       }
     >
@@ -182,7 +75,7 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
         {(['long', 'short'] as Side[]).map((s) => (
           <button key={s} className={`${s} ${side === s ? 'on' : ''}`} onClick={() => setSide(s)}>
             {side === s && <motion.div layoutId="side-thumb" className={`side-thumb ${s}`} transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
-            <span>{s === 'long' ? 'Лонг ↑' : 'Шорт ↓'}</span>
+            <span>{s === 'long' ? 'Long ↑' : 'Short ↓'}</span>
           </button>
         ))}
       </div>
@@ -193,8 +86,8 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
           value={type}
           onChange={setType}
           options={[
-            { value: 'market', label: 'Рыночный' },
-            { value: 'limit', label: 'Лимитный' },
+            { value: 'market', label: 'Market' },
+            { value: 'limit', label: 'Limit' },
           ]}
         />
         <span className="dim mono" style={{ fontSize: 11 }}>
@@ -207,9 +100,9 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
           {type === 'limit' && (
             <motion.div className="field" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
               <label>
-                <span>Цена входа</span>
+                <span>Entry price</span>
                 <span style={{ cursor: 'pointer', color: 'var(--violet-2)' }} onClick={() => setLimit(price.toFixed(2))}>
-                  по рынку
+                  use market
                 </span>
               </label>
               <NumInput value={limit} onChange={setLimit} unit="USDT" step={0.01} />
@@ -219,7 +112,7 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
 
         <div className="field">
           <label>
-            <span>Маржа</span>
+            <span>Margin</span>
             <span>≈ {size.toFixed(3)} SOL</span>
           </label>
           <NumInput value={margin} onChange={setMargin} unit="USDT" />
@@ -234,7 +127,7 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
 
         <div className="field">
           <label>
-            <span>Плечо</span>
+            <span>Leverage</span>
             <span className="mono" style={{ color: lev >= 10 ? 'var(--amber)' : 'var(--ink)' }}>
               x{lev}
             </span>
@@ -259,8 +152,8 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
                 exit={{ opacity: 0, height: 0 }}
                 style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 8, overflow: 'hidden' }}
               >
-                <NumInput value={tp} onChange={setTp} unit="TP" step={0.01} placeholder="Тейк" />
-                <NumInput value={sl} onChange={setSl} unit="SL" step={0.01} placeholder="Стоп" />
+                <NumInput value={tp} onChange={setTp} unit="TP" step={0.01} placeholder="Take profit" />
+                <NumInput value={sl} onChange={setSl} unit="SL" step={0.01} placeholder="Stop loss" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -269,45 +162,45 @@ export function TradePanel({ delay = 0 }: { delay?: number }) {
 
       <div className="divider" />
       <div className="kv">
-        <span>Объём позиции</span>
+        <span>Position size</span>
         <span>{fmtUsd(notional)}</span>
       </div>
       <div className="kv">
-        <span>Цена ликвидации</span>
+        <span>Liquidation price</span>
         <span className="down">{fmtPrice(liq)}</span>
       </div>
       <div className="kv">
-        <span>Комиссия</span>
+        <span>Fee</span>
         <span>{fmtUsd(fee, 3)}</span>
       </div>
       {risk != null && (
         <div className="kv">
-          <span>Риск по SL</span>
+          <span>Risk at SL</span>
           <span className="down">{fmtSigned(risk)} $</span>
         </div>
       )}
       {reward != null && (
         <div className="kv">
-          <span>Профит по TP</span>
+          <span>Profit at TP</span>
           <span className="up">{fmtSigned(reward)} $</span>
         </div>
       )}
 
       <button className={`btn ${side === 'long' ? 'btn-long' : 'btn-short'}`} style={{ width: '100%', marginTop: 16, padding: 15, fontSize: 14 }} disabled={!valid} onClick={submit}>
-        {type === 'market' ? (side === 'long' ? 'Открыть лонг' : 'Открыть шорт') : 'Разместить лимит'} · x{lev}
+        {type === 'market' ? (side === 'long' ? 'Open long' : 'Open short') : 'Place limit'} · x{lev}
       </button>
 
       {mode === 'real' && (
         <div className="locked">
           <div className="orb" style={{ width: 54, height: 54 }} />
           <div className="display" style={{ fontSize: 15, fontWeight: 500 }}>
-            Кошелёк не подключён
+            Wallet not connected
           </div>
           <div className="muted" style={{ fontSize: 12.5, maxWidth: 240 }}>
-            Подключите Solana-кошелёк, чтобы отправлять реальные ордера
+            Connect a Solana wallet (min. $50) to send real orders
           </div>
           <button className="btn btn-primary" onClick={() => setWalletOpen(true)}>
-            Подключить кошелёк
+            Connect wallet
           </button>
         </div>
       )}
@@ -330,32 +223,32 @@ export function PositionsPanel({ delay = 0 }: { delay?: number }) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'pos', label: `Позиции ${positions.length}` },
-            { value: 'ord', label: `Ордера ${orders.length}` },
-            { value: 'hist', label: `История ${history.length}` },
+            { value: 'pos', label: `Positions ${positions.length}` },
+            { value: 'ord', label: `Orders ${orders.length}` },
+            { value: 'hist', label: `History ${history.length}` },
           ]}
         />
       }
       right={
         tab === 'pos' && positions.length > 0 ? (
           <button className="btn btn-ghost btn-xs" onClick={() => closeAll(price)}>
-            Закрыть все
+            Close all
           </button>
         ) : null
       }
     >
       <div className="table-scroll">
-        {tab === 'pos' && (positions.length ? <PosTable positions={positions} price={price} onClose={(id) => closePosition(id, price)} /> : <Empty text="Нет открытых позиций" />)}
+        {tab === 'pos' && (positions.length ? <PosTable positions={positions} price={price} onClose={(id) => closePosition(id, price)} /> : <Empty text="No open positions" />)}
         {tab === 'ord' &&
           (orders.length ? (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Сторона</th>
-                  <th>Цена</th>
-                  <th>Маржа</th>
-                  <th>Плечо</th>
-                  <th>До цены</th>
+                  <th>Side</th>
+                  <th>Price</th>
+                  <th>Margin</th>
+                  <th>Leverage</th>
+                  <th>Distance</th>
                   <th></th>
                 </tr>
               </thead>
@@ -371,7 +264,7 @@ export function PositionsPanel({ delay = 0 }: { delay?: number }) {
                     <td className="mono dim">{fmtPct(((o.price - price) / price) * 100)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button className="btn btn-ghost btn-xs" onClick={() => cancelOrder(o.id)}>
-                        Отменить
+                        Cancel
                       </button>
                     </td>
                   </tr>
@@ -379,19 +272,19 @@ export function PositionsPanel({ delay = 0 }: { delay?: number }) {
               </tbody>
             </table>
           ) : (
-            <Empty text="Нет активных лимитных ордеров" />
+            <Empty text="No active limit orders" />
           ))}
         {tab === 'hist' &&
           (history.length ? (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Сторона</th>
-                  <th>Вход → Выход</th>
-                  <th>Размер</th>
+                  <th>Side</th>
+                  <th>Entry → Exit</th>
+                  <th>Size</th>
                   <th>PnL</th>
-                  <th>Причина</th>
-                  <th>Время</th>
+                  <th>Reason</th>
+                  <th>Held</th>
                 </tr>
               </thead>
               <tbody>
@@ -412,7 +305,7 @@ export function PositionsPanel({ delay = 0 }: { delay?: number }) {
               </tbody>
             </table>
           ) : (
-            <Empty text="Сделок пока нет" />
+            <Empty text="No trades yet" />
           ))}
       </div>
     </Panel>
@@ -424,10 +317,10 @@ export function PosTable({ positions, price, onClose }: { positions: Position[];
     <table className="table">
       <thead>
         <tr>
-          <th>Сторона</th>
-          <th>Размер</th>
-          <th>Вход</th>
-          <th>Ликв.</th>
+          <th>Side</th>
+          <th>Size</th>
+          <th>Entry</th>
+          <th>Liq.</th>
           <th>TP / SL</th>
           <th>PnL</th>
           <th></th>
@@ -444,7 +337,7 @@ export function PosTable({ positions, price, onClose }: { positions: Position[];
                   <span className={`side-tag ${p.side}`}>
                     {p.side === 'long' ? 'LONG' : 'SHORT'} x{p.leverage}
                   </span>{' '}
-                  {p.source !== 'manual' && <span className="src-tag">{p.source === 'bot' ? 'бот' : 'AI'}</span>}
+                  {p.source !== 'manual' && <span className="src-tag">{p.source === 'bot' ? 'AI bot' : 'copilot'}</span>}
                 </td>
                 <td className="mono">{p.size.toFixed(3)} SOL</td>
                 <td className="mono">{fmtPrice(p.entry)}</td>
@@ -457,7 +350,7 @@ export function PosTable({ positions, price, onClose }: { positions: Position[];
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   <button className="btn btn-ghost btn-xs" onClick={() => onClose(p.id)}>
-                    Закрыть
+                    Close
                   </button>
                 </td>
               </motion.tr>
@@ -500,10 +393,10 @@ export function CrossExchange({ delay = 0 }: { delay?: number }) {
   const max = Math.max(...prices)
   return (
     <Panel
-      title="Биржи"
-      k="Арбитраж"
+      title="Exchanges"
+      k="Arbitrage"
       delay={delay}
-      right={live.length > 1 ? <span className="mono dim" style={{ fontSize: 11 }}>спред {(((max - min) / min) * 100).toFixed(3)}%</span> : null}
+      right={live.length > 1 ? <span className="mono dim" style={{ fontSize: 11 }}>spread {(((max - min) / min) * 100).toFixed(3)}%</span> : null}
     >
       {!q && Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton" style={{ height: 30, marginBottom: 8 }} />)}
       {q &&
@@ -528,7 +421,7 @@ export function CrossExchange({ delay = 0 }: { delay?: number }) {
                 )}
               </div>
               <span className="mono" style={{ fontSize: 12, textAlign: 'right' }}>
-                {x.price != null ? fmtPrice(x.price) : <span className="dim">нет доступа</span>}
+                {x.price != null ? fmtPrice(x.price) : <span className="dim">no access</span>}
               </span>
               <span className={`mono ${(x.change ?? 0) >= 0 ? 'up' : 'down'}`} style={{ fontSize: 11, textAlign: 'right' }}>
                 {fmtPct(x.change)}
@@ -538,7 +431,7 @@ export function CrossExchange({ delay = 0 }: { delay?: number }) {
         })}
       {q && !live.length && (
         <div className="dim" style={{ fontSize: 12, marginTop: 12 }}>
-          Публичные API бирж недоступны из этой сети. Текущий источник: {source === 'sim' ? 'симулятор' : source} · {fmtPrice(price)}
+          Exchange APIs are unreachable from this network. Current source: {source === 'sim' ? 'simulator' : source} · {fmtPrice(price)}
         </div>
       )}
     </Panel>

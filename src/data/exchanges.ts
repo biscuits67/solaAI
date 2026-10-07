@@ -436,7 +436,7 @@ const sim = (() => {
 
   const adapter: ExchangeAdapter = {
     id: 'sim',
-    name: 'Симулятор',
+    name: 'Simulator',
     pair: 'SOL/USDT',
     async loadCandles(interval, limit) {
       simInterval = interval

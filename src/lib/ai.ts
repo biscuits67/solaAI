@@ -141,32 +141,32 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
 
   // live micro-structure experts
   let bookV = 0
-  let bookDetail = 'нет данных стакана'
+  let bookDetail = 'no order book data'
   if (book && book.bids.length && book.asks.length) {
     const bs = book.bids.slice(0, 20).reduce((s, l) => s + l.size, 0)
     const as = book.asks.slice(0, 20).reduce((s, l) => s + l.size, 0)
     bookV = clamp(((bs - as) / (bs + as)) * 1.6, -1, 1)
-    bookDetail = `биды ${Math.round((bs / (bs + as)) * 100)}% / аски ${Math.round((as / (bs + as)) * 100)}%`
+    bookDetail = `bids ${Math.round((bs / (bs + as)) * 100)}% / asks ${Math.round((as / (bs + as)) * 100)}%`
   }
   let flowV = 0
-  let flowDetail = 'ожидание сделок'
+  let flowDetail = 'waiting for trades'
   if (trades.length > 5) {
     const b = trades.filter((t) => t.side === 'buy').reduce((s, t) => s + t.size, 0)
     const s = trades.filter((t) => t.side === 'sell').reduce((s2, t) => s2 + t.size, 0)
     flowV = clamp(((b - s) / (b + s || 1)) * 1.4, -1, 1)
-    flowDetail = `покупки ${Math.round((b / (b + s || 1)) * 100)}% за ${trades.length} сделок`
+    flowDetail = `buys ${Math.round((b / (b + s || 1)) * 100)}% of last ${trades.length} trades`
   }
 
   const factors: Factor[] = [
-    { key: 'trend', label: 'Тренд', value: e.trend, weight: W.trend, detail: `EMA21 ${fmt(x.e21[i] ?? px)} vs EMA50 ${fmt(x.e50[i] ?? px)}` },
-    { key: 'momentum', label: 'Импульс', value: e.momentum, weight: W.momentum, detail: `MACD hist ${(x.m.hist[i] ?? 0).toFixed(4)}` },
+    { key: 'trend', label: 'Trend', value: e.trend, weight: W.trend, detail: `EMA21 ${fmt(x.e21[i] ?? px)} vs EMA50 ${fmt(x.e50[i] ?? px)}` },
+    { key: 'momentum', label: 'Momentum', value: e.momentum, weight: W.momentum, detail: `MACD hist ${(x.m.hist[i] ?? 0).toFixed(4)}` },
     { key: 'rsi', label: 'RSI', value: e.rsi, weight: W.rsi, detail: `RSI(14) = ${e.R.toFixed(1)}` },
-    { key: 'bands', label: 'Боллинджер', value: e.bands, weight: W.bands, detail: `%B = ${(e.pb * 100).toFixed(0)}%` },
-    { key: 'volume', label: 'Объём', value: e.volume, weight: W.volume, detail: 'наклон OBV за 20 баров' },
-    { key: 'regression', label: 'Регрессия', value: e.regression, weight: W.regression, detail: `наклон ${(e.reg * 1e4).toFixed(2)} б.п./бар` },
-    { key: 'osc', label: 'Стохастик', value: e.osc, weight: W.osc, detail: `%K = ${e.S.toFixed(0)}` },
-    { key: 'book', label: 'Стакан', value: bookV, weight: W.book, detail: bookDetail },
-    { key: 'flow', label: 'Поток', value: flowV, weight: W.flow, detail: flowDetail },
+    { key: 'bands', label: 'Bollinger', value: e.bands, weight: W.bands, detail: `%B = ${(e.pb * 100).toFixed(0)}%` },
+    { key: 'volume', label: 'Volume', value: e.volume, weight: W.volume, detail: 'OBV slope, 20 bars' },
+    { key: 'regression', label: 'Regression', value: e.regression, weight: W.regression, detail: `slope ${(e.reg * 1e4).toFixed(2)} bp/bar` },
+    { key: 'osc', label: 'Stochastic', value: e.osc, weight: W.osc, detail: `%K = ${e.S.toFixed(0)}` },
+    { key: 'book', label: 'Order book', value: bookV, weight: W.book, detail: bookDetail },
+    { key: 'flow', label: 'Trade flow', value: flowV, weight: W.flow, detail: flowDetail },
   ]
 
   const wsum = factors.reduce((s, f) => s + f.weight, 0)
@@ -197,12 +197,12 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
   const trendStr = Math.abs(e.trend)
   const regime =
     volPct > 1.2 && trendStr < 0.3
-      ? 'Высокая волатильность'
+      ? 'High volatility'
       : trendStr > 0.5
         ? e.trend > 0
-          ? 'Восходящий тренд'
-          : 'Нисходящий тренд'
-        : 'Флэт / накопление'
+          ? 'Uptrend'
+          : 'Downtrend'
+        : 'Range / accumulation'
 
   let plan: Signal['plan'] = null
   if (dir !== 'NEUTRAL') {
@@ -213,16 +213,16 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
 
   const sorted = [...factors].sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight))
   const top = sorted.slice(0, 3)
-  const word = (v: number) => (v > 0.15 ? 'бычий' : v < -0.15 ? 'медвежий' : 'нейтральный')
+  const word = (v: number) => (v > 0.15 ? 'bullish' : v < -0.15 ? 'bearish' : 'neutral')
   const summary = [
     dir === 'NEUTRAL'
-      ? `Модель не видит перевеса: score ${score.toFixed(0)}. Рынок в режиме «${regime.toLowerCase()}».`
-      : `Ансамбль склоняется в ${dir === 'LONG' ? 'лонг' : 'шорт'} с уверенностью ${confidence}%. Режим: ${regime.toLowerCase()}.`,
-    `Ключевые драйверы: ${top.map((f) => `${f.label.toLowerCase()} (${word(f.value)})`).join(', ')}.`,
-    `Прогноз на ${horizon} баров: ${target > px ? 'рост' : 'снижение'} к ${target.toFixed(2)} (${(((target - px) / px) * 100).toFixed(2)}%), коридор 80%: ${forecast.at(-1)!.lower.toFixed(2)} – ${forecast.at(-1)!.upper.toFixed(2)}.`,
+      ? `No clear edge: score ${score.toFixed(0)}. Market regime: ${regime.toLowerCase()}.`
+      : `The ensemble leans ${dir === 'LONG' ? 'long' : 'short'} with ${confidence}% confidence. Regime: ${regime.toLowerCase()}.`,
+    `Key drivers: ${top.map((f) => `${f.label.toLowerCase()} (${word(f.value)})`).join(', ')}.`,
+    `${horizon}-bar forecast: ${target > px ? 'up' : 'down'} to ${target.toFixed(2)} (${(((target - px) / px) * 100).toFixed(2)}%), 80% band ${forecast.at(-1)!.lower.toFixed(2)} – ${forecast.at(-1)!.upper.toFixed(2)}.`,
     lv.support[0] || lv.resistance[0]
-      ? `Ближайшие уровни: поддержка ${lv.support[0]?.price.toFixed(2) ?? '—'}, сопротивление ${lv.resistance[0]?.price.toFixed(2) ?? '—'}.`
-      : 'Значимых уровней рядом с ценой не найдено.',
+      ? `Nearest levels: support ${lv.support[0]?.price.toFixed(2) ?? '—'}, resistance ${lv.resistance[0]?.price.toFixed(2) ?? '—'}.`
+      : 'No significant levels near price.',
   ]
 
   const history = c.map((_, k) => (k < 50 ? 0 : scoreAt(x, k)))
@@ -253,27 +253,27 @@ export type StrategyId = 'ai' | 'trend' | 'revert' | 'breakout'
 
 export const STRATEGIES: Record<StrategyId, { name: string; tag: string; desc: string; hue: number }> = {
   ai: {
-    name: 'Нейро-ансамбль',
-    tag: 'AI · 9 экспертов',
-    desc: 'Голосование девяти моделей: тренд, импульс, осцилляторы, объём и регрессия. Входит, когда score пробивает порог.',
+    name: 'Neural Ensemble',
+    tag: 'AI · 9 experts',
+    desc: 'Nine models vote on trend, momentum, oscillators, volume and regression. Enters when the score crosses the threshold.',
     hue: 268,
   },
   trend: {
     name: 'Trend Rider',
-    tag: 'Тренд · EMA',
-    desc: 'Следует за трендом: пересечение EMA9/EMA21 в направлении EMA50 с подтверждением MACD.',
+    tag: 'Trend · EMA',
+    desc: 'Follows the trend: EMA9/EMA21 cross in the direction of EMA50, confirmed by MACD.',
     hue: 160,
   },
   revert: {
     name: 'Mean Reversion',
-    tag: 'Контртренд · RSI',
-    desc: 'Ловит перекупленность и перепроданность у границ Боллинджера, выходит у средней линии.',
+    tag: 'Counter-trend · RSI',
+    desc: 'Fades overbought / oversold moves at the Bollinger bands, exits at the mid line.',
     hue: 200,
   },
   breakout: {
     name: 'Breakout Scout',
-    tag: 'Пробой · Donchian',
-    desc: 'Входит на пробое 20-барного максимума/минимума с фильтром по объёму.',
+    tag: 'Breakout · Donchian',
+    desc: 'Enters on a break of the 20-bar high/low with a volume filter.',
     hue: 32,
   },
 }
@@ -390,14 +390,14 @@ export function backtest(c: Candle[], p: BtParams): BtResult {
     if (pos) {
       const hitSl = pos.side === 1 ? k.low <= pos.sl : k.high >= pos.sl
       const hitTp = pos.side === 1 ? k.high >= pos.tp : k.low <= pos.tp
-      if (hitSl) close(i, pos.sl, 'Стоп-лосс')
-      else if (hitTp) close(i, pos.tp, 'Тейк-профит')
+      if (hitSl) close(i, pos.sl, 'Stop loss')
+      else if (hitTp) close(i, pos.tp, 'Take profit')
       else {
         const sig = strategySignal(x, i, p.strategy, p.threshold)
-        if (sig === -pos.side) close(i, k.close, 'Разворот сигнала')
+        if (sig === -pos.side) close(i, k.close, 'Signal flip')
         else if (p.strategy === 'revert' && x.bb.mid[i] != null) {
           const mid = x.bb.mid[i]!
-          if ((pos.side === 1 && k.close >= mid) || (pos.side === -1 && k.close <= mid)) close(i, k.close, 'Возврат к средней')
+          if ((pos.side === 1 && k.close >= mid) || (pos.side === -1 && k.close <= mid)) close(i, k.close, 'Mean reached')
         }
       }
     }
@@ -426,7 +426,7 @@ export function backtest(c: Candle[], p: BtParams): BtResult {
     rets.push(mtm / prevEq - 1)
     prevEq = mtm
   }
-  if (pos) close(c.length - 1, c.at(-1)!.close, 'Конец периода')
+  if (pos) close(c.length - 1, c.at(-1)!.close, 'End of period')
 
   const wins = trades.filter((t) => t.pnl > 0)
   const gp = wins.reduce((s, t) => s + t.pnl, 0)

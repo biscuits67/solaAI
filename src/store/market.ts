@@ -79,8 +79,8 @@ export async function startFeed() {
         id === exchange
           ? null
           : id === 'sim'
-            ? 'Биржи недоступны из вашей сети — включён офлайн-симулятор рынка'
-            : `${EXCHANGES[exchange].name} недоступна — данные идут с ${ad.name}`
+            ? 'Exchanges are unreachable from your network — offline market simulator is on'
+            : `${EXCHANGES[exchange].name} is unavailable — streaming from ${ad.name}`
       useMarket.setState({
         source: id,
         candles,

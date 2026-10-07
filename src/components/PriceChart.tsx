@@ -104,7 +104,7 @@ export function PriceChart({ candles, signal, overlays, positions = [], tradeMar
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.18 } },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 8 },
       handleScale: { axisPressedMouseMove: true },
-      localization: { locale: 'ru-RU' },
+      localization: { locale: 'en-US' },
     })
     chart.current = c
     const ser: Record<string, ISeriesApi<any>> = {}

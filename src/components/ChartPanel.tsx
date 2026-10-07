@@ -9,11 +9,11 @@ import { DEFAULT_OVERLAYS, PriceChart, type Overlays } from './PriceChart'
 
 const TOGGLES: { k: keyof Overlays; label: string; color: string }[] = [
   { k: 'ema', label: 'EMA 21/50', color: '#c4a6ff' },
-  { k: 'bb', label: 'Боллинджер', color: '#ffbe55' },
-  { k: 'forecast', label: 'AI-прогноз', color: '#e6dbff' },
-  { k: 'levels', label: 'Уровни', color: '#52c8ff' },
-  { k: 'markers', label: 'Сигналы', color: '#2ff3b3' },
-  { k: 'positions', label: 'Позиции', color: '#ff4f80' },
+  { k: 'bb', label: 'Bollinger', color: '#ffbe55' },
+  { k: 'forecast', label: 'AI forecast', color: '#e6dbff' },
+  { k: 'levels', label: 'Levels', color: '#52c8ff' },
+  { k: 'markers', label: 'AI signals', color: '#2ff3b3' },
+  { k: 'positions', label: 'Positions', color: '#ff4f80' },
   { k: 'score', label: 'AI score', color: '#9d6bff' },
   { k: 'rsi', label: 'RSI', color: '#ffbe55' },
 ]
@@ -65,7 +65,7 @@ export function ChartPanel({ delay = 0, height }: { delay?: number; height?: num
           <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <div className="orb lg" style={{ margin: '0 auto 20px' }} />
-              <div className="eyebrow">{status === 'error' ? 'Нет соединения' : 'Загрузка котировок…'}</div>
+              <div className="eyebrow">{status === 'error' ? 'No connection' : 'Loading market data…'}</div>
             </div>
           </div>
         )}

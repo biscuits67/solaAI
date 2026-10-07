@@ -1,96 +1,46 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EXCHANGES } from '../data/exchanges'
 import type { ExchangeId } from '../data/types'
-import { fmtCompact, fmtPct, fmtPrice, fmtUsd } from '../lib/format'
-import { useBot } from '../store/bot'
+import { fmtPct, fmtPrice, fmtUsd } from '../lib/format'
 import { useMarket } from '../store/market'
-import { equityOf, START_BALANCE, useTrading } from '../store/trading'
-import { useUI, type Tab } from '../store/ui'
+import { equityOf, useTrading } from '../store/trading'
+import { useUI, type Mode, type Tab } from '../store/ui'
 import { AnimatedNumber } from './AnimatedNumber'
-import { Spark } from './canvas'
-import { Segmented } from './Controls'
 
-export const TABS: { id: Tab; label: string; short: string }[] = [
-  { id: 'terminal', label: 'Терминал', short: 'Терминал' },
-  { id: 'ai', label: 'AI-аналитика', short: 'AI' },
-  { id: 'autopilot', label: 'Автопилот', short: 'Бот' },
-  { id: 'backtest', label: 'Бэктест', short: 'Тест' },
-  { id: 'portfolio', label: 'Портфель', short: 'Портфель' },
-  { id: 'guide', label: 'Как это работает', short: 'Гид' },
+export const TABS: { id: Tab; label: string }[] = [
+  { id: 'brain', label: 'AI Brain' },
+  { id: 'trades', label: 'Trades' },
+  { id: 'backtest', label: 'Backtest' },
 ]
 
-export function Sidebar() {
-  const { tab, setTab, mode } = useUI()
-  const botOn = useBot((s) => s.enabled)
+export const MIN_REAL_USD = 50
+
+export function Logo() {
   return (
-    <motion.aside
-      className="glass side"
-      initial={{ opacity: 0, x: -30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <div className="brand">
-        <div className="orb" />
-        <div>
-          <div className="brand-name">
-            Sola <span>AI</span>
-          </div>
-          <div className="brand-sub">Neural trading · SOL</div>
+    <div className="brand">
+      <div className="orb" />
+      <div>
+        <div className="brand-name">
+          Solana <span>AI</span>
         </div>
-      </div>
-      <nav className="nav">
-        {TABS.map((t, i) => (
-          <button key={t.id} className={`nav-item ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-            {tab === t.id && (
-              <motion.div layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 380, damping: 32 }} />
-            )}
-            <span className="n">0{i + 1}</span>
-            <span className="l">{t.label}</span>
-            {t.id === 'autopilot' && botOn && mode === 'demo' && <span className="badge">ON</span>}
-          </button>
-        ))}
-      </nav>
-      <div className="side-foot">{mode === 'demo' ? <MiniEquity /> : <RealSideCard />}</div>
-    </motion.aside>
-  )
-}
-
-function MiniEquity() {
-  const price = useMarket((s) => s.price)
-  const t = useTrading()
-  const eq = equityOf(t, price)
-  const pnl = eq - START_BALANCE
-  const data = useMemo(() => [...t.equityCurve.map((p) => p.v).slice(-80), eq], [t.equityCurve, Math.round(eq)])
-  return (
-    <div className="mini-equity">
-      <div className="eyebrow">Демо-капитал</div>
-      <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 6 }}>
-        <AnimatedNumber value={eq} format={(v) => fmtUsd(v)} />
-      </div>
-      <div className={`mono ${pnl >= 0 ? 'up' : 'down'}`} style={{ fontSize: 12, marginTop: 2 }}>
-        {pnl >= 0 ? '+' : ''}
-        {fmtPrice(pnl)} · {fmtPct((pnl / START_BALANCE) * 100)}
-      </div>
-      <div style={{ marginTop: 10 }}>
-        <Spark data={data.length > 1 ? data : [START_BALANCE, eq]} height={44} baseline={START_BALANCE} />
+        <div className="brand-sub">Neural trading engine</div>
       </div>
     </div>
   )
 }
 
-function RealSideCard() {
-  const open = useUI((s) => s.setWalletOpen)
+function Nav() {
+  const { tab, setTab } = useUI()
   return (
-    <div className="mini-equity">
-      <div className="eyebrow">Реальный режим</div>
-      <div style={{ fontSize: 13, color: 'var(--ink-2)', margin: '8px 0 12px', lineHeight: 1.5 }}>
-        Подключите Solana-кошелёк, чтобы торговать реальными средствами.
-      </div>
-      <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => open(true)}>
-        Подключить кошелёк
-      </button>
-    </div>
+    <nav className="seg top-nav">
+      {TABS.map((t) => (
+        <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+          {tab === t.id && <motion.div layoutId="top-nav" className="thumb" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
   )
 }
 
@@ -101,7 +51,7 @@ export function MobileNav() {
       {TABS.map((t) => (
         <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
           {tab === t.id && <motion.div layoutId="mnav" className="nav-pill" style={{ borderRadius: 16 }} />}
-          <span>{t.short}</span>
+          <span>{t.label}</span>
         </button>
       ))}
     </nav>
@@ -127,41 +77,38 @@ function VenuePicker() {
   const dot = status === 'live' ? '' : status === 'error' ? 'off' : 'warn'
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button className="btn btn-ghost btn-sm" onClick={() => setOpen((o) => !o)} style={{ gap: 10 }}>
+      <button className="btn btn-ghost btn-sm" onClick={() => setOpen((o) => !o)} style={{ gap: 9 }}>
         <span className={`live-dot ${dot}`} />
         {EXCHANGES[source].name}
-        {source !== exchange && <span className="dim" style={{ fontWeight: 400 }}>(резерв)</span>}
-        <motion.span animate={{ rotate: open ? 180 : 0 }} className="dim" style={{ fontSize: 9 }}>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} className="dim" style={{ fontSize: 8 }}>
           ▼
         </motion.span>
       </button>
       <AnimatePresence>
         {open && (
           <motion.div
-            className="glass"
-            style={{ position: 'absolute', right: 0, top: 'calc(100% + 10px)', width: 230, padding: 8, borderRadius: 18, zIndex: 50, background: 'rgba(20,16,36,0.85)' }}
+            className="glass popover"
             initial={{ opacity: 0, y: -8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="eyebrow" style={{ padding: '6px 10px 8px', position: 'relative', zIndex: 2 }}>
-              Источник данных
+            <div className="eyebrow" style={{ padding: '6px 10px 8px' }}>
+              Market data source
             </div>
             {VENUES.map((v) => (
               <button
                 key={v.id}
-                className="wallet-opt"
-                style={{ padding: '10px 12px', marginBottom: 4, border: 0, background: v.id === exchange ? 'rgba(255,255,255,0.07)' : 'transparent', position: 'relative', zIndex: 2 }}
+                className={`venue ${v.id === exchange ? 'on' : ''}`}
                 onClick={() => {
                   setExchange(v.id)
                   setOpen(false)
                 }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: 3, background: v.hue, boxShadow: `0 0 10px ${v.hue}` }} />
-                <span style={{ flex: 1, fontSize: 13 }}>{EXCHANGES[v.id].name}</span>
+                <span style={{ flex: 1 }}>{EXCHANGES[v.id].name}</span>
                 <span className="dim mono" style={{ fontSize: 10 }}>
-                  {v.id === 'sim' ? 'offline' : 'WS · REST'}
+                  {v.id === 'sim' ? 'offline' : 'live'}
                 </span>
               </button>
             ))}
@@ -172,9 +119,28 @@ function VenuePicker() {
   )
 }
 
+function ModeSwitch() {
+  const { mode, setMode, setWelcomeOpen } = useUI()
+  const pick = (m: Mode) => {
+    if (m === mode) return
+    if (m === 'real') setWelcomeOpen(true, 'warn')
+    else setMode('demo')
+  }
+  return (
+    <div className="seg mode">
+      {(['demo', 'real'] as Mode[]).map((m) => (
+        <button key={m} className={mode === m ? 'on' : ''} onClick={() => pick(m)}>
+          {mode === m && <motion.div layoutId="mode-thumb" className={`thumb ${m}`} transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
+          <span>{m === 'demo' ? 'Demo' : 'Real'}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function TopBar() {
   const { price, ticker, lastDir } = useMarket()
-  const { mode, setMode, setWalletOpen } = useUI()
+  const { mode, setWalletOpen } = useUI()
   const t = useTrading()
   const eq = equityOf(t, price)
   const ch = ticker?.changePct ?? 0
@@ -185,52 +151,22 @@ export function TopBar() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="pair">
-        <div className="coin" />
-        <div>
-          <div className="pair-name">SOL / USDT</div>
-          <div className="pair-venue">Solana · Spot</div>
-        </div>
-      </div>
-      <div style={{ marginLeft: 6 }}>
-        <div className={`big-price ${lastDir > 0 ? 'up' : lastDir < 0 ? 'down' : ''}`}>
-          {price ? <AnimatedNumber value={price} format={(v) => fmtPrice(v, 2)} duration={0.35} /> : <span className="skeleton" style={{ display: 'inline-block', width: 110, height: 26 }} />}
-        </div>
-      </div>
-      <div className="stats">
-        <div className="stat">
-          <div className="eyebrow">24ч</div>
-          <div className={`v ${ch >= 0 ? 'up' : 'down'}`}>{fmtPct(ticker?.changePct)}</div>
-        </div>
-        <div className="stat">
-          <div className="eyebrow">Макс</div>
-          <div className="v">{fmtPrice(ticker?.high24h)}</div>
-        </div>
-        <div className="stat">
-          <div className="eyebrow">Мин</div>
-          <div className="v">{fmtPrice(ticker?.low24h)}</div>
-        </div>
-        <div className="stat hide-md">
-          <div className="eyebrow">Объём SOL</div>
-          <div className="v">{fmtCompact(ticker?.volume24h)}</div>
-        </div>
-        <div className="stat hide-md">
-          <div className="eyebrow">Оборот $</div>
-          <div className="v">{fmtCompact(ticker?.quoteVolume24h)}</div>
-        </div>
+      <Logo />
+      <Nav />
+      <div className="top-price">
+        <span className="dim mono" style={{ fontSize: 11 }}>
+          SOL
+        </span>
+        <span className={`mono ${lastDir > 0 ? 'up' : lastDir < 0 ? 'down' : ''}`} style={{ fontSize: 17, fontWeight: 600 }}>
+          {price ? <AnimatedNumber value={price} format={(v) => fmtPrice(v)} duration={0.35} /> : '—'}
+        </span>
+        <span className={`mono ${ch >= 0 ? 'up' : 'down'}`} style={{ fontSize: 11.5 }}>
+          {fmtPct(ticker?.changePct)}
+        </span>
       </div>
       <div className="top-right">
         <VenuePicker />
-        <Segmented
-          className="mode"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: 'demo', label: 'Демо' },
-            { value: 'real', label: 'Реал' },
-          ]}
-          thumbClass={(v) => v}
-        />
+        <ModeSwitch />
         <AnimatePresence mode="popLayout" initial={false}>
           {mode === 'real' ? (
             <motion.button
@@ -242,13 +178,12 @@ export function TopBar() {
               exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
             >
               <span className="dot" />
-              <span className="lbl">Подключить кошелёк</span>
+              <span className="lbl">Connect wallet</span>
             </motion.button>
           ) : (
             <motion.div
               key="d"
-              className="btn btn-ghost btn-sm mono"
-              style={{ cursor: 'default' }}
+              className="btn btn-ghost btn-sm mono balance-chip"
               initial={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
@@ -263,11 +198,131 @@ export function TopBar() {
   )
 }
 
+/* ───────────── Welcome: demo notice + mode choice ───────────── */
+
+export function WelcomeModal() {
+  const { welcomeOpen, welcomeStep, setWelcomeOpen, setMode, setWalletOpen } = useUI()
+  const [step, setStep] = useState<'choose' | 'warn'>(welcomeStep)
+  const [agree, setAgree] = useState(false)
+  useEffect(() => {
+    setStep(welcomeStep)
+    setAgree(false)
+  }, [welcomeOpen, welcomeStep])
+
+  const stayDemo = () => {
+    setMode('demo')
+    setWelcomeOpen(false)
+  }
+  const goReal = () => {
+    setMode('real')
+    setWelcomeOpen(false)
+    setTimeout(() => setWalletOpen(true), 450)
+  }
+
+  return (
+    <AnimatePresence>
+      {welcomeOpen && (
+        <motion.div className="overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+          <motion.div
+            className="glass modal welcome"
+            initial={{ opacity: 0, y: 40, scale: 0.94, filter: 'blur(12px)' }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: 20, scale: 0.96, filter: 'blur(10px)' }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {step === 'choose' ? (
+                <motion.div key="choose" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
+                  <div className="welcome-head">
+                    <div className="orb" style={{ width: 64, height: 64 }} />
+                    <div className="demo-pill">
+                      <span className="live-dot" /> DEMO MODE ACTIVE
+                    </div>
+                  </div>
+                  <h2 className="display welcome-title">
+                    Welcome to <em>Solana AI</em>
+                  </h2>
+                  <p className="muted welcome-text">
+                    You are currently in <b style={{ color: 'var(--mint)' }}>Demo mode</b>. The AI trades a virtual $10,000 balance on live SOL market data — nothing is at risk. Choose how you want to continue:
+                  </p>
+                  <div className="mode-cards">
+                    <motion.button className="mode-card demo on" onClick={stayDemo} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
+                      <div className="mc-top">
+                        <span className="mc-glyph demo" />
+                        <span className="mc-badge">Recommended</span>
+                      </div>
+                      <h4>Demo</h4>
+                      <ul>
+                        <li>$10,000 virtual balance</li>
+                        <li>Live prices from top exchanges</li>
+                        <li>Full AI bot, zero risk</li>
+                      </ul>
+                      <span className="mc-cta">Continue in Demo →</span>
+                    </motion.button>
+                    <motion.button className="mode-card real" onClick={() => setStep('warn')} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
+                      <div className="mc-top">
+                        <span className="mc-glyph real" />
+                        <span className="mc-badge alt">Wallet</span>
+                      </div>
+                      <h4>Real</h4>
+                      <ul>
+                        <li>Connect a Solana wallet</li>
+                        <li>AI trades your real funds</li>
+                        <li>Min. wallet balance ${MIN_REAL_USD}</li>
+                      </ul>
+                      <span className="mc-cta">Switch to Real →</span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div key="warn" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
+                  <div className="warn-icon">!</div>
+                  <h2 className="display welcome-title">Real trading mode</h2>
+                  <p className="muted welcome-text">Before you switch, please read carefully:</p>
+                  <div className="warn-box">
+                    <div className="warn-row strong">
+                      <span className="wr-num">${MIN_REAL_USD}</span>
+                      <span>
+                        The AI bot trades in Real mode <b>only with wallets holding at least ${MIN_REAL_USD}</b>. Smaller balances can be connected but the bot will not open positions.
+                      </span>
+                    </div>
+                    <div className="warn-row">
+                      <span className="wr-dot" />
+                      <span>Trades are executed with your real funds. Crypto trading — especially with leverage — can lose money.</span>
+                    </div>
+                    <div className="warn-row">
+                      <span className="wr-dot" />
+                      <span>AI signals are probabilistic estimates, not financial advice.</span>
+                    </div>
+                  </div>
+                  <label className="agree" onClick={() => setAgree((a) => !a)}>
+                    <span className={`check ${agree ? 'on' : ''}`}>{agree ? '✓' : ''}</span>I understand the risks and the ${MIN_REAL_USD} minimum
+                  </label>
+                  <div className="welcome-actions">
+                    <button className="btn btn-ghost" onClick={stayDemo}>
+                      Stay in Demo
+                    </button>
+                    <button className="btn btn-primary" disabled={!agree} onClick={goReal}>
+                      Switch to Real
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ───────────── Wallet ───────────── */
+
 const WALLETS = [
-  { name: 'Phantom', grad: 'linear-gradient(135deg,#ab9ff2,#534bb1)', l: 'P', tag: 'Популярный' },
-  { name: 'Solflare', grad: 'linear-gradient(135deg,#ffd35c,#fc7d2c)', l: 'S', tag: '' },
-  { name: 'Backpack', grad: 'linear-gradient(135deg,#ff6b6b,#c0283d)', l: 'B', tag: '' },
-  { name: 'Ledger', grad: 'linear-gradient(135deg,#5b5b66,#1c1c22)', l: 'L', tag: 'Аппаратный' },
+  { name: 'Phantom', grad: 'linear-gradient(135deg,#ab9ff2,#534bb1)', l: 'P', tag: 'Most popular' },
+  { name: 'Solflare', grad: 'linear-gradient(135deg,#ffd35c,#fc7d2c)', l: 'S', tag: 'Solana wallet' },
+  { name: 'Backpack', grad: 'linear-gradient(135deg,#ff6b6b,#c0283d)', l: 'B', tag: 'Solana wallet' },
+  { name: 'Ledger', grad: 'linear-gradient(135deg,#5b5b66,#1c1c22)', l: 'L', tag: 'Hardware' },
 ]
 
 export function WalletModal() {
@@ -293,9 +348,9 @@ export function WalletModal() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="eyebrow">Реальный режим</div>
+                <div className="eyebrow">Real mode</div>
                 <h3 className="display" style={{ fontSize: 22, fontWeight: 500, marginTop: 8 }}>
-                  Подключение кошелька
+                  Connect wallet
                 </h3>
               </div>
               <button className="btn btn-ghost btn-xs" onClick={() => setWalletOpen(false)}>
@@ -303,7 +358,7 @@ export function WalletModal() {
               </button>
             </div>
             <p className="muted" style={{ fontSize: 13, margin: '10px 0 20px' }}>
-              Выберите кошелёк Solana. Sola AI никогда не получает доступ к вашим приватным ключам.
+              Choose a Solana wallet. Solana AI never gets access to your private keys.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {WALLETS.map((w, i) => (
@@ -321,17 +376,17 @@ export function WalletModal() {
                   <span style={{ flex: 1 }}>
                     <span style={{ display: 'block', fontWeight: 600 }}>{w.name}</span>
                     <span className="dim" style={{ fontSize: 11.5 }}>
-                      {picked === w.name ? 'Интеграция появится в следующем релизе' : w.tag || 'Solana wallet'}
+                      {picked === w.name ? 'Integration ships in the next release' : w.tag}
                     </span>
                   </span>
                   <span className="dim mono" style={{ fontSize: 11 }}>
-                    {picked === w.name ? 'скоро' : '→'}
+                    {picked === w.name ? 'soon' : '→'}
                   </span>
                 </motion.button>
               ))}
             </div>
             <div className="notice violet" style={{ marginTop: 18, fontSize: 12 }}>
-              Реальная торговля в разработке. Пока используйте демо-режим — он работает на живых котировках.
+              The AI bot trades only with wallets holding at least ${MIN_REAL_USD}. Real execution is in development — use Demo mode in the meantime.
             </div>
           </motion.div>
         </motion.div>

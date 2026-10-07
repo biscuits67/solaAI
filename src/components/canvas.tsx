@@ -470,3 +470,210 @@ export function Pressure({ buy, height = 10 }: { buy: number; height?: number })
   )
   return <canvas ref={ref} style={{ width: '100%', height, display: 'block' }} />
 }
+
+/* ───────────── Neural core: live visualisation of the ensemble ───────────── */
+
+interface Particle {
+  i: number // input index
+  j: number // hidden index
+  p: number // progress 0..2 (0-1 input→hidden, 1-2 hidden→output)
+  s: number // speed
+  c: string
+}
+
+const W_SEED = Array.from({ length: 9 * 5 }, (_, k) => Math.sin(k * 12.9898 + 4.1414) * 0.9)
+
+export function NeuralCore({
+  inputs,
+  score,
+  label,
+  height = 380,
+}: {
+  inputs: { label: string; value: number }[]
+  score: number
+  label: string
+  height?: number
+}) {
+  const cur = useRef<number[]>([])
+  const sc = useRef(0)
+  const parts = useRef<Particle[]>([])
+  const last = useRef(0)
+  const ref = useCanvas(
+    (ctx, w, h, t) => {
+      const dt = Math.min(50, t - (last.current || t))
+      last.current = t
+      const n = inputs.length
+      if (!n) return true
+      cur.current = inputs.map((it, i) => approach(cur.current[i] ?? 0, it.value, 0.06)[0])
+      sc.current = approach(sc.current, score, 0.06)[0]
+      const compact = w < 560
+      const xi = compact ? 96 : 150
+      const xo = w - (compact ? 56 : 110)
+      const xh = (xi + xo) / 2
+      const pad = 26
+      const yi = (i: number) => pad + (i / (n - 1)) * (h - pad * 2)
+      const H = 5
+      const yh = (j: number) => h / 2 + (j - (H - 1) / 2) * Math.min(62, (h - 80) / (H - 1))
+      const yo = h / 2
+      const hid = Array.from({ length: H }, (_, j) => Math.tanh(cur.current.reduce((s, v, i) => s + v * (0.6 + W_SEED[i * H + j]), 0) / 2.2))
+      const outCol = sc.current > 18 ? LONG : sc.current < -18 ? SHORT : AMBER
+      const col = (v: number) => (v >= 0 ? LONG : SHORT)
+
+      // bezier helper
+      const pt = (x0: number, y0: number, x1: number, y1: number, u: number) => {
+        const cx = (x0 + x1) / 2
+        const a = (1 - u) ** 3
+        const b = 3 * (1 - u) ** 2 * u
+        const c = 3 * (1 - u) * u * u
+        const d = u ** 3
+        return [a * x0 + b * cx + c * cx + d * x1, a * y0 + b * y0 + c * y1 + d * y1]
+      }
+      const curve = (x0: number, y0: number, x1: number, y1: number) => {
+        const cx = (x0 + x1) / 2
+        ctx.beginPath()
+        ctx.moveTo(x0, y0)
+        ctx.bezierCurveTo(cx, y0, cx, y1, x1, y1)
+      }
+
+      // edges
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < H; j++) {
+          const v = cur.current[i]
+          curve(xi, yi(i), xh, yh(j))
+          ctx.strokeStyle = v >= 0 ? `rgba(47,243,179,${0.03 + Math.abs(v) * 0.14})` : `rgba(255,79,128,${0.03 + Math.abs(v) * 0.14})`
+          ctx.lineWidth = 1
+          ctx.stroke()
+        }
+      for (let j = 0; j < H; j++) {
+        curve(xh, yh(j), xo, yo)
+        const v = hid[j]
+        ctx.strokeStyle = v >= 0 ? `rgba(47,243,179,${0.08 + Math.abs(v) * 0.3})` : `rgba(255,79,128,${0.08 + Math.abs(v) * 0.3})`
+        ctx.lineWidth = 1 + Math.abs(v) * 1.5
+        ctx.stroke()
+      }
+
+      // spawn particles
+      for (let i = 0; i < n; i++) {
+        const v = cur.current[i]
+        if (Math.random() < Math.abs(v) * 0.09 * (dt / 16) + 0.004)
+          parts.current.push({ i, j: Math.floor(Math.random() * H), p: 0, s: 0.0006 + Math.random() * 0.0005, c: col(v) })
+      }
+      if (parts.current.length > 260) parts.current.splice(0, parts.current.length - 260)
+      ctx.globalCompositeOperation = 'lighter'
+      parts.current = parts.current.filter((q) => {
+        q.p += q.s * dt
+        if (q.p >= 2) return false
+        const [x, y] = q.p < 1 ? pt(xi, yi(q.i), xh, yh(q.j), q.p) : pt(xh, yh(q.j), xo, yo, q.p - 1)
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 6)
+        g.addColorStop(0, q.c)
+        g.addColorStop(1, q.c + '00')
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(x, y, 6, 0, Math.PI * 2)
+        ctx.fill()
+        return true
+      })
+      ctx.globalCompositeOperation = 'source-over'
+
+      // input nodes + labels
+      ctx.textBaseline = 'middle'
+      for (let i = 0; i < n; i++) {
+        const v = cur.current[i]
+        const y = yi(i)
+        const c = Math.abs(v) < 0.08 ? 'rgba(232,230,255,0.5)' : col(v)
+        ctx.shadowColor = c
+        ctx.shadowBlur = 8 + Math.abs(v) * 14
+        ctx.fillStyle = '#0d0b18'
+        ctx.beginPath()
+        ctx.arc(xi, y, 7, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.lineWidth = 2
+        ctx.strokeStyle = c
+        ctx.stroke()
+        ctx.shadowBlur = 0
+        ctx.fillStyle = c
+        ctx.beginPath()
+        ctx.arc(xi, y, 2.5 + Math.abs(v) * 2, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.textAlign = 'right'
+        ctx.font = `500 ${compact ? 10.5 : 12}px "Onest Variable", sans-serif`
+        ctx.fillStyle = 'rgba(245,244,252,0.85)'
+        ctx.fillText(inputs[i].label, xi - 16, y - (compact ? 0 : 6))
+        if (!compact) {
+          ctx.font = '500 10.5px "JetBrains Mono Variable", monospace'
+          ctx.fillStyle = c
+          ctx.fillText(`${v > 0 ? '+' : ''}${(v * 100).toFixed(0)}`, xi - 16, y + 8)
+        }
+      }
+
+      // hidden nodes
+      for (let j = 0; j < H; j++) {
+        const v = hid[j]
+        const r = 9 + Math.abs(v) * 4 + Math.sin(t / 300 + j) * 0.8
+        const g = ctx.createRadialGradient(xh - 2, yh(j) - 2, 1, xh, yh(j), r)
+        g.addColorStop(0, '#fff')
+        g.addColorStop(0.4, v >= 0 ? 'rgba(47,243,179,0.8)' : 'rgba(255,79,128,0.8)')
+        g.addColorStop(1, 'rgba(157,107,255,0.15)')
+        ctx.shadowColor = col(v)
+        ctx.shadowBlur = 18 * Math.abs(v)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(xh, yh(j), r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.shadowBlur = 0
+      }
+
+      // output node
+      const R = compact ? 34 : 46
+      const pulse = 1 + Math.sin(t / 380) * 0.05
+      for (let k = 3; k >= 1; k--) {
+        ctx.strokeStyle = outCol
+        ctx.globalAlpha = 0.12 / k
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.arc(xo, yo, R * pulse + k * 12 + ((t / 30) % 12), 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      const og = ctx.createRadialGradient(xo - R * 0.3, yo - R * 0.3, 2, xo, yo, R)
+      og.addColorStop(0, 'rgba(255,255,255,0.35)')
+      og.addColorStop(0.5, '#1a1530')
+      og.addColorStop(1, '#0d0b18')
+      ctx.shadowColor = outCol
+      ctx.shadowBlur = 40
+      ctx.fillStyle = og
+      ctx.beginPath()
+      ctx.arc(xo, yo, R * pulse, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.shadowBlur = 0
+      ctx.lineWidth = 2
+      ctx.strokeStyle = outCol
+      ctx.stroke()
+      // score arc
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.arc(xo, yo, R * pulse + 6, -Math.PI / 2, -Math.PI / 2 + (Math.abs(sc.current) / 100) * Math.PI * 2 * Math.sign(sc.current || 1), sc.current < 0)
+      ctx.stroke()
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#fff'
+      ctx.font = `600 ${compact ? 17 : 22}px "JetBrains Mono Variable", monospace`
+      ctx.fillText(`${sc.current > 0 ? '+' : ''}${sc.current.toFixed(0)}`, xo, yo - 4)
+      ctx.font = `600 ${compact ? 8.5 : 10}px "Unbounded", sans-serif`
+      ctx.fillStyle = outCol
+      ctx.fillText(label, xo, yo + (compact ? 13 : 16))
+
+      // column captions
+      if (!compact) {
+        ctx.font = '500 9.5px "JetBrains Mono Variable", monospace'
+        ctx.fillStyle = 'rgba(232,230,255,0.3)'
+        ctx.textAlign = 'center'
+        ctx.fillText('HIDDEN LAYER', xh, h - 6)
+        ctx.fillText('OUTPUT', xo, h - 6)
+      }
+      return true
+    },
+    [inputs, score, label],
+  )
+  return <canvas ref={ref} style={{ width: '100%', height, display: 'block' }} />
+}

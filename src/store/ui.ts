@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type Mode = 'demo' | 'real'
-export type Tab = 'terminal' | 'ai' | 'autopilot' | 'backtest' | 'portfolio' | 'guide'
+export type Tab = 'brain' | 'trades' | 'backtest'
 export type ToastKind = 'info' | 'long' | 'short' | 'error'
 
 export interface Toast {
@@ -15,10 +15,13 @@ interface UIState {
   mode: Mode
   tab: Tab
   walletOpen: boolean
+  welcomeOpen: boolean
+  welcomeStep: 'choose' | 'warn'
   toasts: Toast[]
   setMode: (m: Mode) => void
   setTab: (t: Tab) => void
   setWalletOpen: (v: boolean) => void
+  setWelcomeOpen: (v: boolean, step?: 'choose' | 'warn') => void
   dismiss: (id: number) => void
 }
 
@@ -36,9 +39,11 @@ const write = (k: string, v: string) => {
 }
 
 export const useUI = create<UIState>((set) => ({
-  mode: read<Mode>('sola.mode', 'demo'),
-  tab: read<Tab>('sola.tab', 'terminal'),
+  mode: 'demo',
+  tab: (['brain', 'trades', 'backtest'] as Tab[]).includes(read<Tab>('sola.tab', 'brain')) ? read<Tab>('sola.tab', 'brain') : 'brain',
   walletOpen: false,
+  welcomeOpen: true,
+  welcomeStep: 'choose',
   toasts: [],
   setMode: (mode) => {
     write('sola.mode', mode)
@@ -50,6 +55,7 @@ export const useUI = create<UIState>((set) => ({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   },
   setWalletOpen: (walletOpen) => set({ walletOpen }),
+  setWelcomeOpen: (welcomeOpen, welcomeStep = 'choose') => set({ welcomeOpen, welcomeStep }),
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))
 

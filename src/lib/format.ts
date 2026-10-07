@@ -19,19 +19,19 @@ export const fmtCompact = (v: number | null | undefined) => {
 }
 
 export const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  new Date(ms).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
 export const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  new Date(ms).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 export const fmtDuration = (ms: number) => {
   const s = Math.floor(ms / 1000)
-  if (s < 60) return `${s}с`
+  if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}м ${s % 60}с`
+  if (m < 60) return `${m}m ${s % 60}s`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}ч ${m % 60}м`
-  return `${Math.floor(h / 24)}д ${h % 24}ч`
+  if (h < 24) return `${h}h ${m % 60}m`
+  return `${Math.floor(h / 24)}d ${h % 24}h`
 }
 
 export const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))

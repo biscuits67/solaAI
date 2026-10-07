@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { buildCtx, scoreAt, strategySignal, STRATEGIES, type StrategyId } from '../lib/ai'
 import { useMarket } from './market'
 import { useTrading } from './trading'
+import { think } from './thoughts'
 import { toast } from './ui'
 
 export interface BotLog {
@@ -47,10 +48,13 @@ export const useBot = create<BotState>()(
       toggle: () => {
         const on = !get().enabled
         set({ enabled: on, startedAt: on ? Date.now() : null, lastBar: 0 })
-        get().log(on ? `Автопилот запущен · ${STRATEGIES[get().strategy].name}` : 'Автопилот остановлен', 'info')
-        toast(on ? 'Автопилот запущен' : 'Автопилот остановлен', STRATEGIES[get().strategy].name, on ? 'long' : 'info')
+        get().log(on ? `AI bot started · ${STRATEGIES[get().strategy].name}` : 'AI bot stopped', 'info')
+        toast(on ? 'AI bot started' : 'AI bot stopped', STRATEGIES[get().strategy].name, on ? 'long' : 'info')
       },
-      log: (text, kind = 'think') => set({ logs: [{ t: Date.now(), text, kind }, ...get().logs].slice(0, 120) }),
+      log: (text, kind = 'think') => {
+        set({ logs: [{ t: Date.now(), text, kind }, ...get().logs].slice(0, 120) })
+        think(kind === 'open' || kind === 'close' ? 'EXECUTE' : 'BOT', text, kind === 'open' ? 'bull' : kind === 'close' ? 'warn' : 'neutral')
+      },
     }),
     { name: 'sola.bot.v1', partialize: ({ logs, lastBar, set: _s, toggle: _t, log: _l, ...rest }) => ({ ...rest, logs: logs.slice(0, 40) }) },
   ),
@@ -81,7 +85,7 @@ export function botStep() {
   if (newBar) {
     useBot.setState({ lastBar: barTime })
     bot.log(
-      `Новая свеча · score ${score.toFixed(0)} · ATR ${A.toFixed(3)} · ${sig === 1 ? 'сигнал LONG' : sig === -1 ? 'сигнал SHORT' : 'сигнала нет'}`,
+      `New candle · score ${score.toFixed(0)} · ATR ${A.toFixed(3)} · ${sig === 1 ? 'LONG signal' : sig === -1 ? 'SHORT signal' : 'no signal, holding'}`,
     )
   }
 
@@ -89,8 +93,8 @@ export function botStep() {
   for (const p of mine) {
     const dir = p.side === 'long' ? 1 : -1
     if (sig === -dir) {
-      tr.closePosition(p.id, price, 'Сигнал автопилота')
-      bot.log(`Закрыл ${p.side === 'long' ? 'лонг' : 'шорт'} по развороту сигнала @ ${price.toFixed(2)}`, 'close')
+      tr.closePosition(p.id, price, 'AI bot signal')
+      bot.log(`Closed ${p.side} on signal flip @ ${price.toFixed(2)}`, 'close')
     }
   }
 
@@ -107,7 +111,7 @@ export function botStep() {
     if (p) lastEntryBar = barTime
     if (p)
       bot.log(
-        `Открыл ${side === 'long' ? 'LONG' : 'SHORT'} ${p.size.toFixed(3)} SOL @ ${price.toFixed(2)} · SL ${sl.toFixed(2)} · TP ${tp.toFixed(2)}`,
+        `Opened ${side === 'long' ? 'LONG' : 'SHORT'} ${p.size.toFixed(3)} SOL @ ${price.toFixed(2)} · SL ${sl.toFixed(2)} · TP ${tp.toFixed(2)}`,
         'open',
       )
   }

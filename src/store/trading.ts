@@ -92,7 +92,7 @@ export function equityOf(s: Pick<TradingState, 'balance' | 'positions' | 'orders
   )
 }
 
-const sideRu = (s: Side) => (s === 'long' ? 'Лонг' : 'Шорт')
+const sideRu = (s: Side) => (s === 'long' ? 'Long' : 'Short')
 
 export const useTrading = create<TradingState>()(
   persist(
@@ -110,7 +110,7 @@ export const useTrading = create<TradingState>()(
         const fee = notional * TAKER
         if (margin <= 0 || !price) return null
         if (margin + fee > s.balance + 1e-9) {
-          toast('Недостаточно средств', `Нужно ${(margin + fee).toFixed(2)} USDT`, 'error')
+          toast('Insufficient funds', `Need ${(margin + fee).toFixed(2)} USDT`, 'error')
           return null
         }
         const pos: Position = {
@@ -128,8 +128,8 @@ export const useTrading = create<TradingState>()(
         }
         set({ balance: s.balance - margin - fee, positions: [pos, ...s.positions] })
         toast(
-          `${sideRu(side)} открыт`,
-          `${pos.size.toFixed(3)} SOL по ${price.toFixed(2)} · x${leverage}`,
+          `${sideRu(side)} opened`,
+          `${pos.size.toFixed(3)} SOL at ${price.toFixed(2)} · x${leverage}`,
           side === 'long' ? 'long' : 'short',
         )
         return pos
@@ -138,12 +138,12 @@ export const useTrading = create<TradingState>()(
       placeLimit: ({ side, margin, leverage, price, sl = null, tp = null, source = 'manual' }) => {
         const s = get()
         if (margin > s.balance) {
-          toast('Недостаточно средств', `Нужно ${margin.toFixed(2)} USDT`, 'error')
+          toast('Insufficient funds', `Need ${margin.toFixed(2)} USDT`, 'error')
           return
         }
         const o: LimitOrder = { id: uid(), side, price, margin, leverage, sl, tp, createdAt: Date.now(), source }
         set({ balance: s.balance - margin, orders: [o, ...s.orders] })
-        toast('Лимитный ордер размещён', `${sideRu(side)} по ${price.toFixed(2)}`, 'info')
+        toast('Limit order placed', `${sideRu(side)} at ${price.toFixed(2)}`, 'info')
       },
 
       cancelOrder: (id) => {
@@ -151,15 +151,15 @@ export const useTrading = create<TradingState>()(
         const o = s.orders.find((x) => x.id === id)
         if (!o) return
         set({ balance: s.balance + o.margin, orders: s.orders.filter((x) => x.id !== id) })
-        toast('Ордер отменён', `${sideRu(o.side)} по ${o.price.toFixed(2)}`, 'info')
+        toast('Order cancelled', `${sideRu(o.side)} at ${o.price.toFixed(2)}`, 'info')
       },
 
-      closePosition: (id, price, reason = 'Вручную') => {
+      closePosition: (id, price, reason = 'Manual') => {
         const s = get()
         const p = s.positions.find((x) => x.id === id)
         if (!p) return
         const fee = p.size * price * TAKER
-        const gross = reason === 'Ликвидация' ? -p.margin : upnl(p, price)
+        const gross = reason === 'Liquidation' ? -p.margin : upnl(p, price)
         const pnl = gross - fee
         const back = Math.max(0, p.margin + pnl)
         const tr: ClosedTrade = {
@@ -182,7 +182,7 @@ export const useTrading = create<TradingState>()(
           history: [tr, ...s.history].slice(0, 300),
         })
         toast(
-          `${reason}: ${sideRu(p.side).toLowerCase()} закрыт`,
+          `${reason}: ${sideRu(p.side).toLowerCase()} closed`,
           `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT`,
           pnl >= 0 ? 'long' : 'short',
         )
@@ -223,14 +223,14 @@ export const useTrading = create<TradingState>()(
             orders: st.orders.filter((x) => x.id !== o.id),
             positions: [pos, ...st.positions],
           })
-          toast('Лимитный ордер исполнен', `${sideRu(o.side)} ${pos.size.toFixed(3)} SOL по ${o.price.toFixed(2)}`, o.side)
+          toast('Limit order filled', `${sideRu(o.side)} ${pos.size.toFixed(3)} SOL at ${o.price.toFixed(2)}`, o.side)
         }
         // triggers
         for (const p of get().positions) {
           const long = p.side === 'long'
-          if (long ? price <= p.liq : price >= p.liq) get().closePosition(p.id, p.liq, 'Ликвидация')
-          else if (p.sl != null && (long ? price <= p.sl : price >= p.sl)) get().closePosition(p.id, price, 'Стоп-лосс')
-          else if (p.tp != null && (long ? price >= p.tp : price <= p.tp)) get().closePosition(p.id, price, 'Тейк-профит')
+          if (long ? price <= p.liq : price >= p.liq) get().closePosition(p.id, p.liq, 'Liquidation')
+          else if (p.sl != null && (long ? price <= p.sl : price >= p.sl)) get().closePosition(p.id, price, 'Stop loss')
+          else if (p.tp != null && (long ? price >= p.tp : price <= p.tp)) get().closePosition(p.id, price, 'Take profit')
         }
         // equity sampling (every 20s)
         const st = get()
@@ -244,7 +244,7 @@ export const useTrading = create<TradingState>()(
 
       reset: (balance = START_BALANCE) => {
         set({ balance, positions: [], orders: [], history: [], equityCurve: [{ t: Date.now(), v: balance }] })
-        toast('Демо-счёт сброшен', `Баланс ${balance.toLocaleString('ru-RU')} USDT`, 'info')
+        toast('Demo account reset', `Balance ${balance.toLocaleString('en-US')} USDT`, 'info')
       },
     }),
     { name: 'sola.demo.v1', partialize: (s) => ({ ...s, lastPrice: 0 }) },
