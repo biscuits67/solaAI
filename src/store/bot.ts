@@ -1,0 +1,114 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { buildCtx, scoreAt, strategySignal, STRATEGIES, type StrategyId } from '../lib/ai'
+import { useMarket } from './market'
+import { useTrading } from './trading'
+import { toast } from './ui'
+
+export interface BotLog {
+  t: number
+  text: string
+  kind: 'think' | 'open' | 'close' | 'info'
+}
+
+export interface BotConfig {
+  strategy: StrategyId
+  riskPct: number
+  leverage: number
+  slAtr: number
+  tpAtr: number
+  threshold: number
+}
+
+interface BotState extends BotConfig {
+  enabled: boolean
+  startedAt: number | null
+  logs: BotLog[]
+  lastBar: number
+  set: (p: Partial<BotConfig>) => void
+  toggle: () => void
+  log: (text: string, kind?: BotLog['kind']) => void
+}
+
+export const useBot = create<BotState>()(
+  persist(
+    (set, get) => ({
+      enabled: false,
+      startedAt: null,
+      strategy: 'ai',
+      riskPct: 1.5,
+      leverage: 3,
+      slAtr: 1.6,
+      tpAtr: 2.8,
+      threshold: 35,
+      logs: [],
+      lastBar: 0,
+      set: (p) => set(p),
+      toggle: () => {
+        const on = !get().enabled
+        set({ enabled: on, startedAt: on ? Date.now() : null, lastBar: 0 })
+        get().log(on ? `Автопилот запущен · ${STRATEGIES[get().strategy].name}` : 'Автопилот остановлен', 'info')
+        toast(on ? 'Автопилот запущен' : 'Автопилот остановлен', STRATEGIES[get().strategy].name, on ? 'long' : 'info')
+      },
+      log: (text, kind = 'think') => set({ logs: [{ t: Date.now(), text, kind }, ...get().logs].slice(0, 120) }),
+    }),
+    { name: 'sola.bot.v1', partialize: ({ logs, lastBar, set: _s, toggle: _t, log: _l, ...rest }) => ({ ...rest, logs: logs.slice(0, 40) }) },
+  ),
+)
+
+let lastEntryBar = 0
+
+/** One autopilot evaluation. Called periodically from the app shell. */
+export function botStep() {
+  const bot = useBot.getState()
+  if (!bot.enabled) return
+  const { candles, price } = useMarket.getState()
+  if (candles.length < 80 || !price) return
+  const tr = useTrading.getState()
+  const x = buildCtx(candles)
+  const i = candles.length - 1
+  const closed = i - 1
+  const barTime = candles[i].time
+  const newBar = barTime !== bot.lastBar
+  const A = x.a[i] ?? price * 0.005
+  const score = scoreAt(x, i)
+  const mine = tr.positions.filter((p) => p.source === 'bot')
+
+  let sig = 0
+  if (bot.strategy === 'ai') sig = score > bot.threshold ? 1 : score < -bot.threshold ? -1 : 0
+  else if (newBar) sig = strategySignal(x, closed, bot.strategy, bot.threshold)
+
+  if (newBar) {
+    useBot.setState({ lastBar: barTime })
+    bot.log(
+      `Новая свеча · score ${score.toFixed(0)} · ATR ${A.toFixed(3)} · ${sig === 1 ? 'сигнал LONG' : sig === -1 ? 'сигнал SHORT' : 'сигнала нет'}`,
+    )
+  }
+
+  // exit on opposite signal
+  for (const p of mine) {
+    const dir = p.side === 'long' ? 1 : -1
+    if (sig === -dir) {
+      tr.closePosition(p.id, price, 'Сигнал автопилота')
+      bot.log(`Закрыл ${p.side === 'long' ? 'лонг' : 'шорт'} по развороту сигнала @ ${price.toFixed(2)}`, 'close')
+    }
+  }
+
+  if (sig !== 0 && barTime !== lastEntryBar && useTrading.getState().positions.filter((p) => p.source === 'bot').length === 0) {
+    const equity = useTrading.getState().balance
+    const stopDist = A * bot.slAtr
+    const qty = (equity * (bot.riskPct / 100)) / stopDist
+    const margin = Math.min((qty * price) / bot.leverage, equity * 0.5)
+    if (margin < 5) return
+    const side = sig === 1 ? 'long' : 'short'
+    const sl = price - sig * stopDist
+    const tp = price + sig * A * bot.tpAtr
+    const p = useTrading.getState().openMarket({ side, margin, leverage: bot.leverage, sl, tp, source: 'bot' }, price)
+    if (p) lastEntryBar = barTime
+    if (p)
+      bot.log(
+        `Открыл ${side === 'long' ? 'LONG' : 'SHORT'} ${p.size.toFixed(3)} SOL @ ${price.toFixed(2)} · SL ${sl.toFixed(2)} · TP ${tp.toFixed(2)}`,
+        'open',
+      )
+  }
+}
