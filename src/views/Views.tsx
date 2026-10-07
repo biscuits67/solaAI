@@ -158,6 +158,7 @@ function Stat({
   sol,
   hint,
   empty,
+  split,
 }: {
   label: string
   value: number
@@ -169,6 +170,7 @@ function Stat({
   sol?: boolean
   hint?: string
   empty?: boolean
+  split?: { won: number; lost: number }
 }) {
   return (
     <Card delay={delay}>
@@ -181,8 +183,19 @@ function Stat({
           {sol && !empty && <Sol usd={value} signed={value < 0} />}
           {sub && <div className="stat-sub">{sub}</div>}
         </div>
-        {ring != null && !empty && <Ring value={ring} size={60} color={ring >= 0.5 ? '#19fb9b' : '#ffbe55'} />}
+        {ring != null && !empty && !split && <Ring value={ring} size={60} color={ring >= 0.5 ? '#19fb9b' : '#ffbe55'} />}
       </div>
+      {split && !empty && (
+        <div className="split">
+          <div className="split-bar">
+            <motion.i className="won" initial={{ width: 0 }} animate={{ width: `${(split.won / (split.won + split.lost || 1)) * 100}%` }} transition={{ duration: DUR.story, ease: EASE.emphasized }} />
+          </div>
+          <div className="split-leg">
+            <span className="up">{split.won} won</span>
+            <span className="down">{split.lost} lost</span>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
@@ -213,7 +226,16 @@ export function PerformanceView() {
       <div className="fx-grid g4">
         <Stat label="Balance" value={eq} fmt={(v) => money(v)} delay={0.04} sol />
         <Stat label="Total profit" value={pnl} fmt={(v) => money(v, { sign: true })} cls={tone(pnl)} sub={`${pct((pnl / START_BALANCE) * 100)} since start`} delay={0.08} />
-        <Stat label="Winning trades" value={n ? (wins / n) * 100 : 0} fmt={(v) => `${v.toFixed(0)}%`} ring={n ? wins / n : undefined} sub={n ? `${wins} of ${n} trades` : 'no trades yet'} delay={0.12} empty={!n} />
+        <Stat
+          label="Winning trades"
+          hint="The share of your closed trades that ended in profit."
+          value={n ? (wins / n) * 100 : 0}
+          fmt={(v) => `${v.toFixed(0)}%`}
+          split={{ won: wins, lost: n - wins }}
+          sub={n ? undefined : 'no trades yet'}
+          delay={0.12}
+          empty={!n}
+        />
         <Stat label="Fees paid" value={fees} fmt={(v) => money(v)} sub={n ? `${n} trades` : 'no trades yet'} delay={0.16} empty={!n} />
       </div>
 
@@ -462,7 +484,14 @@ function Backtest() {
             <div className="fx-grid g4">
               <Stat label="Result" value={r.totalReturn} fmt={(v) => pct(v)} cls={tone(r.totalReturn)} sub={`Just holding SOL: ${pct(r.buyHold)}`} />
               <Stat label="Worst dip" value={-r.maxDrawdown} fmt={(v) => pct(v, 1)} cls="down" sub="largest drop from a peak" />
-              <Stat label="Winning trades" value={r.winRate} fmt={(v) => `${v.toFixed(0)}%`} ring={r.winRate / 100} sub={`${r.trades.length} trades`} empty={!r.trades.length} />
+              <Stat
+                label="Winning trades"
+                hint="The share of the test's trades that ended in profit."
+                value={r.winRate}
+                fmt={(v) => `${v.toFixed(0)}%`}
+                split={{ won: r.trades.filter((t) => t.pnl > 0).length, lost: r.trades.filter((t) => t.pnl <= 0).length }}
+                empty={!r.trades.length}
+              />
               <Stat label="Won per $1 lost" value={isFinite(r.profitFactor) ? r.profitFactor : 99} fmt={(v) => money(v)} sub="profit factor" empty={!r.trades.length} />
             </div>
             <Card title="Trades on the chart">

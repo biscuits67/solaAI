@@ -1184,3 +1184,25 @@ button:focus:not(:focus-visible) {
 .card .chat {
   height: 380px;
 }
+.split {
+  margin-top: 14px;
+}
+.split-bar {
+  height: 8px;
+  border-radius: 8px;
+  background: rgba(255, 92, 122, 0.55);
+  overflow: hidden;
+}
+.split-bar .won {
+  display: block;
+  height: 100%;
+  background: var(--long);
+  border-right: 2px solid var(--card);
+}
+.split-leg {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
