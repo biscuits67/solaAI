@@ -87,7 +87,7 @@ export function PriceChart({ candles, signal, overlays, positions = [], tradeMar
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: C.ink3,
-        fontFamily: '"JetBrains Mono Variable", monospace',
+        fontFamily: '"Geist Mono Variable", monospace',
         fontSize: 11,
         attributionLogo: false,
         panes: { separatorColor: 'rgba(255,255,255,0.06)', separatorHoverColor: 'rgba(157,107,255,0.25)', enableResize: true },

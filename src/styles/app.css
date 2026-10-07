@@ -974,8 +974,7 @@ body {
   .step-cards {
     grid-template-columns: 1fr;
   }
-  .fx-right .btn-ghost .vname,
-  .fx-logo span {
+  .fx-logo .ver {
     display: none;
   }
   .expert {

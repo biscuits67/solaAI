@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-/** Ambient backdrop: drifting light blobs, masked grid and canvas-generated film grain. */
+/** Canvas-generated film grain over the whole app. */
 export function Background() {
   const grain = useMemo(() => {
     const c = document.createElement('canvas')
@@ -15,13 +15,5 @@ export function Background() {
     ctx.putImageData(img, 0, 0)
     return c.toDataURL('image/png')
   }, [])
-  return (
-    <div className="backdrop" aria-hidden>
-      <div className="blob b1" />
-      <div className="blob b2" />
-      <div className="blob b3" />
-      <div className="gridlines" />
-      <div className="grain" style={{ backgroundImage: `url(${grain})` }} />
-    </div>
-  )
+  return <div className="fx-grain" aria-hidden style={{ backgroundImage: `url(${grain})` }} />
 }

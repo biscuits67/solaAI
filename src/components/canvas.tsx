@@ -150,7 +150,7 @@ export function Gauge({ value, height = 190 }: { value: number; height?: number 
       ctx.arc(cx, cy, 9, 0, Math.PI * 2)
       ctx.fill()
 
-      ctx.font = '500 10px "JetBrains Mono Variable", monospace'
+      ctx.font = '500 10px "Geist Mono Variable", monospace'
       ctx.fillStyle = 'rgba(232,230,255,0.38)'
       ctx.textAlign = 'left'
       ctx.fillText('SHORT', cx - r - 6, cy + 16)
@@ -193,7 +193,7 @@ export function Radar({ items, height = 280 }: { items: { label: string; value: 
       }
       ctx.setLineDash([])
       // spokes + labels
-      ctx.font = '500 10.5px "Onest Variable", sans-serif'
+      ctx.font = '500 10.5px "Geist Variable", sans-serif'
       items.forEach((it, i) => {
         const a = ang(i)
         ctx.strokeStyle = 'rgba(255,255,255,0.06)'
@@ -312,7 +312,7 @@ export function DepthChart({
       ctx.lineTo(X(mid), h - 16)
       ctx.stroke()
       ctx.setLineDash([])
-      ctx.font = '500 10px "JetBrains Mono Variable", monospace'
+      ctx.font = '500 10px "Geist Mono Variable", monospace'
       ctx.fillStyle = 'rgba(232,230,255,0.4)'
       ctx.textAlign = 'left'
       ctx.fillText(minP.toFixed(2), pad, h - 3)
@@ -418,7 +418,7 @@ export function Ring({ value, size = 96, color = LONG, label }: { value: number;
       ctx.stroke()
       ctx.shadowBlur = 0
       ctx.fillStyle = '#f5f4fc'
-      ctx.font = `600 ${Math.round(size / 5)}px "JetBrains Mono Variable", monospace`
+      ctx.font = `600 ${Math.round(size / 5)}px "Geist Mono Variable", monospace`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(label ?? `${Math.round(v * 100)}%`, cx, cy + 1)
@@ -597,11 +597,11 @@ export function NeuralCore({
         ctx.arc(xi, y, 2.5 + Math.abs(v) * 2, 0, Math.PI * 2)
         ctx.fill()
         ctx.textAlign = 'right'
-        ctx.font = `500 ${compact ? 10.5 : 12}px "Onest Variable", sans-serif`
+        ctx.font = `500 ${compact ? 10.5 : 12}px "Geist Variable", sans-serif`
         ctx.fillStyle = 'rgba(245,244,252,0.85)'
         ctx.fillText(inputs[i].label, xi - 16, y - (compact ? 0 : 6))
         if (!compact) {
-          ctx.font = '500 10.5px "JetBrains Mono Variable", monospace'
+          ctx.font = '500 10.5px "Geist Mono Variable", monospace'
           ctx.fillStyle = c
           ctx.fillText(`${v > 0 ? '+' : ''}${(v * 100).toFixed(0)}`, xi - 16, y + 8)
         }
@@ -658,15 +658,15 @@ export function NeuralCore({
       ctx.stroke()
       ctx.textAlign = 'center'
       ctx.fillStyle = '#fff'
-      ctx.font = `600 ${compact ? 17 : 22}px "JetBrains Mono Variable", monospace`
+      ctx.font = `600 ${compact ? 17 : 22}px "Geist Mono Variable", monospace`
       ctx.fillText(`${sc.current > 0 ? '+' : ''}${sc.current.toFixed(0)}`, xo, yo - 4)
-      ctx.font = `600 ${compact ? 8.5 : 10}px "Unbounded", sans-serif`
+      ctx.font = `600 ${compact ? 8.5 : 10}px "Geist Variable", sans-serif`
       ctx.fillStyle = outCol
       ctx.fillText(label, xo, yo + (compact ? 13 : 16))
 
       // column captions
       if (!compact) {
-        ctx.font = '500 9.5px "JetBrains Mono Variable", monospace'
+        ctx.font = '500 9.5px "Geist Mono Variable", monospace'
         ctx.fillStyle = 'rgba(232,230,255,0.3)'
         ctx.textAlign = 'center'
         ctx.fillText('HIDDEN LAYER', xh, h - 6)
@@ -730,7 +730,7 @@ export function PriceLine({
         ctx.lineWidth = 2
         ctx.stroke()
         ctx.setLineDash([])
-        ctx.font = '600 10.5px "Onest Variable", sans-serif'
+        ctx.font = '600 10.5px "Geist Variable", sans-serif'
         ctx.fillStyle = '#14f195'
         ctx.textAlign = 'right'
         ctx.fillText('AI forecast', w - 8, Y(fc.at(-1)!.hi) - 8)
@@ -785,7 +785,7 @@ export function PriceLine({
         ctx.fill()
         const d = new Date(points[i].t * 1000)
         const label = `$${points[i].v.toFixed(2)} · ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-        ctx.font = '600 11px "Onest Variable", sans-serif'
+        ctx.font = '600 11px "Geist Variable", sans-serif'
         const tw = ctx.measureText(label).width + 18
         const bx = Math.min(Math.max(x - tw / 2, 0), w - tw)
         ctx.fillStyle = '#f4f5f7'
@@ -800,7 +800,7 @@ export function PriceLine({
       }
 
       // time axis
-      ctx.font = '500 10px "Onest Variable", sans-serif'
+      ctx.font = '500 10px "Geist Variable", sans-serif'
       ctx.fillStyle = 'rgba(139,141,152,0.8)'
       ctx.textAlign = 'center'
       for (let j = 0; j < 4; j++) {

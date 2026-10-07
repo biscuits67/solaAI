@@ -9,6 +9,7 @@ import { NumInput, Range, Segmented } from '../components/Controls'
 import { ActivityRows, BalanceCard, Card, InsightStrip, PositionsCard, PriceCard, SignalHero, useEquity } from '../components/Fintech'
 import { DEFAULT_OVERLAYS, PriceChart } from '../components/PriceChart'
 import { Sol } from '../components/Session'
+import { Icon } from '../components/Icon'
 import { CrossExchange, Empty } from '../components/TradeWidgets'
 import { EXCHANGES } from '../data/exchanges'
 import { INTERVALS, type Candle, type Interval } from '../data/types'
@@ -390,7 +391,7 @@ export function HowView() {
       <div className="step-cards">
         {PIPELINE.map((st, i) => (
           <motion.div key={st} className={`step-card ${i === idx ? 'on' : ''} ${i < idx ? 'done' : ''}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 + i * 0.06, duration: 0.6, ease: EASE }}>
-            <div className="n">{i < idx ? '✓' : i + 1}</div>
+            <div className="n">{i < idx ? <Icon name="check" size={12} /> : i + 1}</div>
             <h4>{STEPS[st][0]}</h4>
             <p>{STEPS[st][1]}</p>
           </motion.div>

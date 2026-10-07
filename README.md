@@ -35,6 +35,6 @@ A short tutorial opens after the mode is chosen (can be disabled or reopened fro
 WebSocket + REST from Binance → Bybit → OKX with automatic fallback. If no exchange is reachable, an offline market simulator kicks in (a banner says so).
 
 ## Stack
-Vite, React, TypeScript, lightweight-charts, framer-motion, zustand. Fonts: Unbounded / Onest / JetBrains Mono. No SVG — icons and logo are CSS, visualisations are canvas.
+Vite, React, TypeScript, lightweight-charts, framer-motion, zustand. Fonts: Geist / Geist Mono. No SVG — icons and logo are CSS, visualisations are canvas.
 
 > AI signals are probabilistic estimates, not financial advice.

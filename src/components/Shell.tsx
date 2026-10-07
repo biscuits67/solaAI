@@ -5,6 +5,7 @@ import type { ExchangeId } from '../data/types'
 import { useMarket } from '../store/market'
 import { useUI, type Mode } from '../store/ui'
 import { SolanaLogo } from './SolanaLogo'
+import { Icon } from './Icon'
 
 export const MIN_REAL_USD = 50
 
@@ -31,7 +32,7 @@ export function VenuePicker() {
         <span className={`live-dot ${dot}`} />
         {EXCHANGES[source].name}
         <motion.span animate={{ rotate: open ? 180 : 0 }} className="dim" style={{ fontSize: 8 }}>
-          ▼
+          <Icon name="chevron" size={10} />
         </motion.span>
       </button>
       <AnimatePresence>
@@ -146,7 +147,7 @@ export function WelcomeModal() {
                   <div className="mode-cards">
                     <motion.button className="mode-card demo" onClick={stayDemo} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
                       <div className="mc-top">
-                        <span className="mc-glyph demo" />
+                        <span className="mc-glyph demo"><Icon name="spark" size={16} /></span>
                         <span className="mc-badge">No risk</span>
                       </div>
                       <h4>Demo</h4>
@@ -159,7 +160,7 @@ export function WelcomeModal() {
                     </motion.button>
                     <motion.button className="mode-card real" onClick={() => setStep('warn')} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
                       <div className="mc-top">
-                        <span className="mc-glyph real" />
+                        <span className="mc-glyph real"><SolanaLogo size={20} tile={false} /></span>
                         <span className="mc-badge alt">Wallet</span>
                       </div>
                       <h4>Real</h4>
@@ -194,7 +195,7 @@ export function WelcomeModal() {
                     </div>
                   </div>
                   <label className="agree" onClick={() => setAgree((a) => !a)}>
-                    <span className={`check ${agree ? 'on' : ''}`}>{agree ? '✓' : ''}</span>I understand the risks and the ${MIN_REAL_USD} minimum
+                    <span className={`check ${agree ? 'on' : ''}`}>{agree ? <Icon name="check" size={12} /> : null}</span>I understand the risks and the ${MIN_REAL_USD} minimum
                   </label>
                   <div className="welcome-actions">
                     <button className="btn btn-ghost" onClick={stayDemo}>

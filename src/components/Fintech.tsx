@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Interval } from '../data/types'
 import { STRATEGIES, type StrategyId } from '../lib/ai'
 import { fmtPrice, fmtSigned, fmtUsd } from '../lib/format'
-import { action, confidenceWord, headline, mood, plainFactor } from '../lib/plain'
+import { action, confidenceWord, headline, horizon, mood, plainFactor } from '../lib/plain'
 import { useBot } from '../store/bot'
 import { useMarket } from '../store/market'
 import { useSignal } from '../store/signal'
@@ -13,6 +13,7 @@ import { AnimatedNumber } from './AnimatedNumber'
 import { PriceLine } from './canvas'
 import { MIN_REAL_USD, ModeSwitch, VenuePicker } from './Shell'
 import { SolanaLogo } from './SolanaLogo'
+import { Icon, type IconName } from './Icon'
 import { SessionLive, SessionSheet, Sol } from './Session'
 import { useSession } from '../store/session'
 
@@ -70,6 +71,7 @@ export function Header() {
       <div className="fx-logo">
         <SolanaLogo size={36} />
         Solana AI
+        <span className="ver">BETA</span>
       </div>
       <nav className="fx-nav">
         {TABS.map((t) => (
@@ -84,6 +86,86 @@ export function Header() {
         <ModeSwitch />
       </div>
     </motion.header>
+  )
+}
+
+export function StatusBar() {
+  const { price, ticker, source, status } = useMarket()
+  const signal = useSignal((s) => s.signal)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const ch = ticker?.changePct ?? 0
+  return (
+    <div className="fx-status">
+      <span className="ok">
+        <i style={status === 'live' ? undefined : { background: 'var(--amber)', boxShadow: '0 0 8px var(--amber)' }} />
+        {status === 'live' ? 'All systems operational' : 'Connecting…'}
+      </span>
+      <span className="sep" />
+      <span>
+        SOL <b>${fmtPrice(price)}</b> <b style={{ color: ch >= 0 ? 'var(--long)' : 'var(--short)' }}>{fmtSigned(ch)}%</b>
+      </span>
+      <span className="sep hide-sm" />
+      <span className="hide-sm">
+        24h volume <b>${ticker ? (ticker.quoteVolume24h / 1e6).toFixed(1) : '—'}M</b>
+      </span>
+      <div className="right">
+        <span>
+          AI engine <b>{signal ? `${signal.confidence}% conf.` : 'warming up'}</b>
+        </span>
+        <span>
+          Feed <b>{source}</b>
+        </span>
+        <span>
+          <b>{new Date(now).toLocaleTimeString('en-US', { hour12: false })}</b> UTC{-new Date().getTimezoneOffset() / 60 >= 0 ? '+' : ''}
+          {-new Date().getTimezoneOffset() / 60}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+export function Footer() {
+  const setTab = useUI((s) => s.setTab)
+  const setTutorialOpen = useUI((s) => s.setTutorialOpen)
+  return (
+    <footer>
+      <div className="fx-foot">
+        <div>
+          <div className="fx-logo">
+            <SolanaLogo size={30} />
+            Solana AI
+          </div>
+          <p>Neural trading engine for Solana. Nine AI models read live market data from leading exchanges every second.</p>
+        </div>
+        <div>
+          <h5>Product</h5>
+          <a onClick={() => setTab('home')}>Overview</a>
+          <a onClick={() => setTab('activity')}>Activity</a>
+          <a onClick={() => setTab('performance')}>Performance</a>
+          <a onClick={() => setTab('how')}>How AI decides</a>
+        </div>
+        <div>
+          <h5>Resources</h5>
+          <a onClick={() => setTutorialOpen(true)}>Getting started</a>
+          <a onClick={() => setTab('how')}>AI methodology</a>
+          <a onClick={() => setTab('performance')}>Backtesting</a>
+        </div>
+        <div>
+          <h5>Market data</h5>
+          <a>Binance</a>
+          <a>Bybit</a>
+          <a>OKX</a>
+        </div>
+      </div>
+      <div className="fx-legal">
+        <span>© {new Date().getFullYear()} Solana AI. All rights reserved.</span>
+        <span>Charts by TradingView Lightweight Charts™ · Trading involves risk. Not financial advice.</span>
+      </div>
+    </footer>
   )
 }
 
@@ -206,7 +288,7 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
 interface Act {
   key: string
   tone: 'up' | 'down' | 'flat' | 'ai'
-  glyph: string
+  glyph: IconName
   title: string
   sub: string
   amount?: number
@@ -225,7 +307,7 @@ export function useActivity(): Act[] {
       items.push({
         key: 'p' + p.id,
         tone: 'ai',
-        glyph: '◷',
+        glyph: 'clock',
         title: `${p.side === 'long' ? 'Holding' : 'Short'} ${p.size.toFixed(2)} SOL`,
         sub: `${src(p.source)} · opened ${time(p.openedAt)} at $${p.entry.toFixed(2)}`,
         amount: upnl(p, price),
@@ -235,14 +317,14 @@ export function useActivity(): Act[] {
       items.push({
         key: 'h' + h.id + h.closedAt,
         tone: h.pnl >= 0 ? 'up' : 'down',
-        glyph: h.side === 'long' ? '↑' : '↓',
+        glyph: h.side === 'long' ? 'up' : 'down',
         title: `${h.side === 'long' ? 'Bought' : 'Sold'} ${h.size.toFixed(2)} SOL`,
         sub: `${h.reason} · ${src(h.source)} · ${time(h.closedAt)}`,
         amount: h.pnl,
         t: h.closedAt,
       })
     if (bot.enabled && !positions.some((p) => p.source === 'bot'))
-      items.push({ key: 'wait', tone: 'flat', glyph: '…', title: 'Waiting for a good entry', sub: 'AI bot is watching the market', t: 2e12 })
+      items.push({ key: 'wait', tone: 'flat', glyph: 'dots', title: 'Waiting for a good entry', sub: 'AI bot is watching the market', t: 2e12 })
     return items.sort((a, b) => b.t - a.t)
   }, [positions, history, bot.enabled, Math.round(price * 10)])
 }
@@ -252,7 +334,9 @@ export function ActivityRows({ limit = 50 }: { limit?: number }) {
   if (!items.length)
     return (
       <div className="row" style={{ borderTop: 0 }}>
-        <div className="ri flat">…</div>
+        <div className="ri flat">
+          <Icon name="dots" size={16} />
+        </div>
         <div>
           <div className="rt">No activity yet</div>
           <div className="rs">Press “Start AI” and the AI will trade for you</div>
@@ -264,7 +348,9 @@ export function ActivityRows({ limit = 50 }: { limit?: number }) {
       <AnimatePresence initial={false}>
         {items.map((a) => (
           <motion.div key={a.key} className="row" layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: EASE }}>
-            <div className={`ri ${a.tone}`}>{a.glyph}</div>
+            <div className={`ri ${a.tone}`}>
+              <Icon name={a.glyph} size={16} />
+            </div>
             <div style={{ minWidth: 0 }}>
               <div className="rt">{a.title}</div>
               <div className="rs">{a.sub}</div>
@@ -300,8 +386,10 @@ export function SignalHero({ delay = 0 }: { delay?: number }) {
 
   return (
     <Card className={`sig-card ${dir}`} delay={delay}>
-      <div className="lab">
-        <span className="live-dot" /> AI signal · live
+      <div>
+        <span className="pill-live">
+          <span className="live-dot" style={{ background: '#fff' }} /> AI signal · live
+        </span>
       </div>
       <AnimatePresence mode="wait">
         <motion.div
@@ -324,6 +412,22 @@ export function SignalHero({ delay = 0 }: { delay?: number }) {
       <div style={{ fontSize: 12.5, marginTop: 8, color: 'rgba(255,255,255,0.8)' }}>
         {signal ? `Confidence ${signal.confidence}% · ${confidenceWord(signal.confidence)}` : '—'}
       </div>
+      {signal && !(session.active && mode === 'demo') && (
+        <div className="sig-stats">
+          <div>
+            <span>Expected in {horizon(interval)}</span>
+            <b>${fmtPrice(signal.forecast.at(-1)!.value)}</b>
+          </div>
+          <div>
+            <span>Models agree</span>
+            <b>{signal.factors.filter((f) => Math.sign(f.value) === Math.sign(signal.score)).length} / 9</b>
+          </div>
+          <div>
+            <span>Market mood</span>
+            <b>{mood(signal.score).word}</b>
+          </div>
+        </div>
+      )}
       {session.active && mode === 'demo' ? (
         <SessionLive />
       ) : (
@@ -388,6 +492,20 @@ export function PriceCard({ delay = 0, height = 280 }: { delay?: number; height?
             {t.label}
           </button>
         ))}
+      </div>
+      <div className="px-stats">
+        <div>
+          <span>24h high</span>
+          <b>${fmtPrice(ticker?.high24h)}</b>
+        </div>
+        <div>
+          <span>24h low</span>
+          <b>${fmtPrice(ticker?.low24h)}</b>
+        </div>
+        <div>
+          <span>24h volume</span>
+          <b>${ticker ? (ticker.quoteVolume24h / 1e6).toFixed(1) + 'M' : '—'}</b>
+        </div>
       </div>
     </Card>
   )
@@ -464,7 +582,7 @@ export function PositionsCard({ delay = 0 }: { delay?: number }) {
           return (
             <motion.div key={p.id} className="pos" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
               <div className={`ri ${p.side === 'long' ? 'up' : 'down'}`} style={{ width: 44, height: 44, borderRadius: 15, display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-                {p.side === 'long' ? '↑' : '↓'}
+                <Icon name={p.side === 'long' ? 'up' : 'down'} size={16} />
               </div>
               <div>
                 <div className="rt" style={{ fontWeight: 600 }}>
@@ -602,7 +720,7 @@ function TradeSheet({ side }: { side: Side }) {
         )}
         <div className="kv2">
           <span>AI opinion</span>
-          <span style={{ color: agrees ? 'var(--long)' : 'var(--amber)' }}>{signal ? (agrees ? 'Agrees ✓' : signal.direction === 'NEUTRAL' ? 'Neutral' : 'Disagrees') : '—'}</span>
+          <span style={{ color: agrees ? 'var(--long)' : 'var(--amber)' }}>{signal ? (agrees ? 'Agrees' : signal.direction === 'NEUTRAL' ? 'Neutral' : 'Disagrees') : '—'}</span>
         </div>
       </div>
       <button

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect } from 'react'
-import { Header, MobileNav, Sheets } from './components/Fintech'
+import { Footer, Header, MobileNav, Sheets, StatusBar } from './components/Fintech'
+import { Background } from './components/Background'
 import { SessionResult } from './components/Session'
 import { Toasts, WalletModal, WelcomeModal } from './components/Shell'
 import { Tutorial } from './components/Tutorial'
@@ -40,7 +41,9 @@ export default function App() {
   return (
     <>
       <div className="fx-glow" />
+      <Background />
       <div className="fx-shell">
+        <StatusBar />
         <Header />
         <AnimatePresence>
           {notice && (
@@ -61,9 +64,7 @@ export default function App() {
             <View />
           </motion.main>
         </AnimatePresence>
-        <footer className="lab" style={{ fontSize: 12, textAlign: 'center', padding: '40px 0 0' }}>
-          Solana AI · market data from Binance / Bybit / OKX · charts by TradingView Lightweight Charts™ · not financial advice
-        </footer>
+        <Footer />
       </div>
       <MobileNav />
       <Sheets />

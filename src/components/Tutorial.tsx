@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useUI } from '../store/ui'
 import { MIN_REAL_USD } from './Shell'
 import { SolanaLogo } from './SolanaLogo'
+import { Icon } from './Icon'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -211,7 +212,7 @@ export function Tutorial() {
             </div>
             <div className="tut-foot">
               <label className="agree" style={{ marginTop: 0, fontSize: 12.5 }} onClick={() => setNever((v) => !v)}>
-                <span className={`check ${never ? 'on' : ''}`}>{never ? '✓' : ''}</span>
+                <span className={`check ${never ? 'on' : ''}`}>{never ? <Icon name="check" size={12} /> : null}</span>
                 Don’t show again
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
