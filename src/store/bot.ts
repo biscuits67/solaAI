@@ -85,7 +85,7 @@ export function botStep() {
   if (newBar) {
     useBot.setState({ lastBar: barTime })
     bot.log(
-      `New candle · score ${score.toFixed(0)} · ATR ${A.toFixed(3)} · ${sig === 1 ? 'LONG signal' : sig === -1 ? 'SHORT signal' : 'no signal, holding'}`,
+      `New candle checked — ${sig === 1 ? 'buy signal' : sig === -1 ? 'sell signal' : 'no trade yet'} (score ${score.toFixed(0)})`,
     )
   }
 
@@ -94,7 +94,7 @@ export function botStep() {
     const dir = p.side === 'long' ? 1 : -1
     if (sig === -dir) {
       tr.closePosition(p.id, price, 'AI bot signal')
-      bot.log(`Closed ${p.side} on signal flip @ ${price.toFixed(2)}`, 'close')
+      bot.log(`Closed the ${p.side === 'long' ? 'buy' : 'sell'} position at $${price.toFixed(2)} — the signal reversed`, 'close')
     }
   }
 
@@ -111,7 +111,7 @@ export function botStep() {
     if (p) lastEntryBar = barTime
     if (p)
       bot.log(
-        `Opened ${side === 'long' ? 'LONG' : 'SHORT'} ${p.size.toFixed(3)} SOL @ ${price.toFixed(2)} · SL ${sl.toFixed(2)} · TP ${tp.toFixed(2)}`,
+        `${side === 'long' ? 'Bought' : 'Sold'} ${p.size.toFixed(2)} SOL at $${price.toFixed(2)} · safety stop $${sl.toFixed(2)} · target $${tp.toFixed(2)}`,
         'open',
       )
   }

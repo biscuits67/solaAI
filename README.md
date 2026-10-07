@@ -14,12 +14,13 @@ npm run build    # production build in dist/
 
 | Tab | What it shows |
 | --- | --- |
-| **AI Brain** | Live neural network visualisation (9 experts → hidden layer → output), 5-stage reasoning pipeline, AI signal gauge & confidence, chart with AI forecast cone / levels / signal markers, live **AI thought stream**, AI trading bot control, forecast, demo equity, chat copilot |
-| **Trades** | Equity KPIs, positions / orders / history, manual order panel, PnL by source, PnL heatmap, cross-exchange prices |
-| **Backtest** | Replay any of 4 strategies over up to 1000 candles with equity curve, trade markers and stats |
+| **Home** | Balance with Start AI / Buy / Sell / More buttons, live AI signal in plain English (“Buy SOL”, “Wait”), price chart with AI forecast, target / safety stop / market mood, open positions |
+| **Activity** | Every trade, a live stream of what the AI is thinking, AI copilot chat, prices across exchanges |
+| **Performance** | Balance, profit, win rate, balance over time, who made the money, best hours to trade, backtest on past data |
+| **How AI decides** | 5-step pipeline, live neural network, the 9 models and their votes, live reasoning, pro chart |
 
 ## Modes
-- On every visit a welcome modal says you are in **Demo** mode and lets you pick Demo or Real.
+- On every visit a welcome modal asks the user to pick **Demo** or **Real** (nothing is pre-selected).
 - **Demo** — $10,000 virtual balance on live prices; the AI bot, copilot and manual trading are fully functional.
 - **Real** — shows a warning that the AI bot trades only with wallets holding **at least $50**, then a *Connect wallet* flow (UI only, no wallet logic yet).
 

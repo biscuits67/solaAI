@@ -32,6 +32,7 @@ export function useCanvas(draw: Draw, deps: unknown[]) {
     kick.current = () => {
       if (!raf && w && h) raf = requestAnimationFrame(loop)
     }
+    ;(cv as any).__kick = () => kick.current()
     const ro = new ResizeObserver(([e]) => {
       w = e.contentRect.width
       h = e.contentRect.height
@@ -676,4 +677,156 @@ export function NeuralCore({
     [inputs, score, label],
   )
   return <canvas ref={ref} style={{ width: '100%', height, display: 'block' }} />
+}
+
+/* ───────────── Price line with AI forecast (fintech style) ───────────── */
+
+export function PriceLine({
+  points,
+  forecast,
+  height = 240,
+  color = '#7c5cff',
+}: {
+  points: { t: number; v: number }[]
+  forecast?: { t: number; v: number; lo: number; hi: number }[]
+  height?: number
+  color?: string
+}) {
+  const prog = useRef(0)
+  const hover = useRef<number | null>(null)
+  const ref = useCanvas(
+    (ctx, w, h) => {
+      if (points.length < 2) return
+      const [p, moving] = approach(prog.current, 1, 0.07)
+      prog.current = p
+      const fc = forecast ?? []
+      const n = points.length + Math.max(0, fc.length - 1)
+      const vals = [...points.map((x) => x.v), ...fc.flatMap((f) => [f.lo, f.hi])]
+      const mn = Math.min(...vals)
+      const mx = Math.max(...vals)
+      const pad = (mx - mn) * 0.08 || 1
+      const top = 8
+      const bot = h - 22
+      const X = (i: number) => (i / (n - 1)) * (w - 8)
+      const Y = (v: number) => bot - ((v - mn + pad) / (mx - mn + pad * 2)) * (bot - top)
+      const k = Math.max(2, Math.floor(points.length * p))
+
+      // forecast band + line
+      if (fc.length > 1 && p > 0.98) {
+        const o = points.length - 1
+        ctx.beginPath()
+        fc.forEach((f, i) => (i ? ctx.lineTo(X(o + i), Y(f.hi)) : ctx.moveTo(X(o), Y(f.hi))))
+        for (let i = fc.length - 1; i >= 0; i--) ctx.lineTo(X(o + i), Y(fc[i].lo))
+        ctx.closePath()
+        const bg = ctx.createLinearGradient(X(o), 0, w, 0)
+        bg.addColorStop(0, 'rgba(20,241,149,0.02)')
+        bg.addColorStop(1, 'rgba(20,241,149,0.14)')
+        ctx.fillStyle = bg
+        ctx.fill()
+        ctx.setLineDash([5, 5])
+        ctx.beginPath()
+        fc.forEach((f, i) => (i ? ctx.lineTo(X(o + i), Y(f.v)) : ctx.moveTo(X(o), Y(f.v))))
+        ctx.strokeStyle = '#14f195'
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.font = '600 10.5px "Onest Variable", sans-serif'
+        ctx.fillStyle = '#14f195'
+        ctx.textAlign = 'right'
+        ctx.fillText('AI forecast', w - 8, Y(fc.at(-1)!.hi) - 8)
+      }
+
+      // area
+      const g = ctx.createLinearGradient(0, top, 0, bot)
+      g.addColorStop(0, color + '44')
+      g.addColorStop(1, color + '00')
+      ctx.beginPath()
+      for (let i = 0; i < k; i++) i ? ctx.lineTo(X(i), Y(points[i].v)) : ctx.moveTo(X(i), Y(points[i].v))
+      ctx.lineTo(X(k - 1), bot)
+      ctx.lineTo(0, bot)
+      ctx.closePath()
+      ctx.fillStyle = g
+      ctx.fill()
+      ctx.beginPath()
+      for (let i = 0; i < k; i++) i ? ctx.lineTo(X(i), Y(points[i].v)) : ctx.moveTo(X(i), Y(points[i].v))
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2.2
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+
+      // live dot
+      const lx = X(k - 1)
+      const ly = Y(points[k - 1].v)
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.arc(lx, ly, 4.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = color + '55'
+      ctx.lineWidth = 6
+      ctx.beginPath()
+      ctx.arc(lx, ly, 8, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // hover
+      const hx = hover.current
+      if (hx != null && p > 0.98) {
+        const i = Math.max(0, Math.min(points.length - 1, Math.round((hx / (w - 8)) * (n - 1))))
+        const x = X(i)
+        const y = Y(points[i].v)
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(x, top)
+        ctx.lineTo(x, bot)
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.beginPath()
+        ctx.arc(x, y, 4, 0, Math.PI * 2)
+        ctx.fill()
+        const d = new Date(points[i].t * 1000)
+        const label = `$${points[i].v.toFixed(2)} · ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+        ctx.font = '600 11px "Onest Variable", sans-serif'
+        const tw = ctx.measureText(label).width + 18
+        const bx = Math.min(Math.max(x - tw / 2, 0), w - tw)
+        ctx.fillStyle = '#f4f5f7'
+        ctx.beginPath()
+        ctx.roundRect(bx, top, tw, 24, 12)
+        ctx.fill()
+        ctx.fillStyle = '#0c0d12'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(label, bx + 9, top + 12.5)
+        ctx.textBaseline = 'alphabetic'
+      }
+
+      // time axis
+      ctx.font = '500 10px "Onest Variable", sans-serif'
+      ctx.fillStyle = 'rgba(139,141,152,0.8)'
+      ctx.textAlign = 'center'
+      for (let j = 0; j < 4; j++) {
+        const i = Math.floor((j / 3) * (points.length - 1))
+        const d = new Date(points[i].t * 1000)
+        const span = points.at(-1)!.t - points[0].t
+        const txt = span > 2 * 86400 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        ctx.textAlign = j === 0 ? 'left' : j === 3 ? 'right' : 'center'
+        ctx.fillText(txt, X(i), h - 4)
+      }
+      return moving
+    },
+    [points, forecast, color],
+  )
+  return (
+    <canvas
+      ref={ref}
+      style={{ width: '100%', height, display: 'block', cursor: 'crosshair' }}
+      onPointerMove={(e) => {
+        hover.current = e.clientX - e.currentTarget.getBoundingClientRect().left
+        ;(e.currentTarget as any).__kick?.()
+      }}
+      onPointerLeave={(e) => {
+        hover.current = null
+        ;(e.currentTarget as any).__kick?.()
+      }}
+    />
+  )
 }

@@ -2,61 +2,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { EXCHANGES } from '../data/exchanges'
 import type { ExchangeId } from '../data/types'
-import { fmtPct, fmtPrice, fmtUsd } from '../lib/format'
 import { useMarket } from '../store/market'
-import { equityOf, useTrading } from '../store/trading'
-import { useUI, type Mode, type Tab } from '../store/ui'
-import { AnimatedNumber } from './AnimatedNumber'
-
-export const TABS: { id: Tab; label: string }[] = [
-  { id: 'brain', label: 'AI Brain' },
-  { id: 'trades', label: 'Trades' },
-  { id: 'backtest', label: 'Backtest' },
-]
+import { useUI, type Mode } from '../store/ui'
 
 export const MIN_REAL_USD = 50
-
-export function Logo() {
-  return (
-    <div className="brand">
-      <div className="orb" />
-      <div>
-        <div className="brand-name">
-          Solana <span>AI</span>
-        </div>
-        <div className="brand-sub">Neural trading engine</div>
-      </div>
-    </div>
-  )
-}
-
-function Nav() {
-  const { tab, setTab } = useUI()
-  return (
-    <nav className="seg top-nav">
-      {TABS.map((t) => (
-        <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-          {tab === t.id && <motion.div layoutId="top-nav" className="thumb" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}
-          <span>{t.label}</span>
-        </button>
-      ))}
-    </nav>
-  )
-}
-
-export function MobileNav() {
-  const { tab, setTab } = useUI()
-  return (
-    <nav className="glass mobile-nav">
-      {TABS.map((t) => (
-        <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-          {tab === t.id && <motion.div layoutId="mnav" className="nav-pill" style={{ borderRadius: 16 }} />}
-          <span>{t.label}</span>
-        </button>
-      ))}
-    </nav>
-  )
-}
 
 const VENUES: { id: ExchangeId; hue: string }[] = [
   { id: 'binance', hue: '#f3ba2f' },
@@ -65,7 +14,7 @@ const VENUES: { id: ExchangeId; hue: string }[] = [
   { id: 'sim', hue: '#9d6bff' },
 ]
 
-function VenuePicker() {
+export function VenuePicker() {
   const { exchange, source, status, setExchange } = useMarket()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -119,7 +68,7 @@ function VenuePicker() {
   )
 }
 
-function ModeSwitch() {
+export function ModeSwitch() {
   const { mode, setMode, setWelcomeOpen } = useUI()
   const pick = (m: Mode) => {
     if (m === mode) return
@@ -135,66 +84,6 @@ function ModeSwitch() {
         </button>
       ))}
     </div>
-  )
-}
-
-export function TopBar() {
-  const { price, ticker, lastDir } = useMarket()
-  const { mode, setWalletOpen } = useUI()
-  const t = useTrading()
-  const eq = equityOf(t, price)
-  const ch = ticker?.changePct ?? 0
-  return (
-    <motion.header
-      className="glass topbar"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <Logo />
-      <Nav />
-      <div className="top-price">
-        <span className="dim mono" style={{ fontSize: 11 }}>
-          SOL
-        </span>
-        <span className={`mono ${lastDir > 0 ? 'up' : lastDir < 0 ? 'down' : ''}`} style={{ fontSize: 17, fontWeight: 600 }}>
-          {price ? <AnimatedNumber value={price} format={(v) => fmtPrice(v)} duration={0.35} /> : '—'}
-        </span>
-        <span className={`mono ${ch >= 0 ? 'up' : 'down'}`} style={{ fontSize: 11.5 }}>
-          {fmtPct(ticker?.changePct)}
-        </span>
-      </div>
-      <div className="top-right">
-        <VenuePicker />
-        <ModeSwitch />
-        <AnimatePresence mode="popLayout" initial={false}>
-          {mode === 'real' ? (
-            <motion.button
-              key="w"
-              className="btn btn-primary wallet-btn"
-              onClick={() => setWalletOpen(true)}
-              initial={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
-            >
-              <span className="dot" />
-              <span className="lbl">Connect wallet</span>
-            </motion.button>
-          ) : (
-            <motion.div
-              key="d"
-              className="btn btn-ghost btn-sm mono balance-chip"
-              initial={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)' }}
-            >
-              <span className="live-dot" />
-              <AnimatedNumber value={eq} format={(v) => fmtUsd(v)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.header>
   )
 }
 

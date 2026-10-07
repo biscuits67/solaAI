@@ -7,6 +7,7 @@ import '@fontsource/unbounded/500.css'
 import '@fontsource/unbounded/600.css'
 import '@fontsource/unbounded/700.css'
 import './styles/global.css'
+import './styles/app.css'
 import App from './App'
 
 // favicon rendered on a canvas (no image assets)
