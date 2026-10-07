@@ -20,10 +20,13 @@ interface MarketState {
   setInterval: (i: Interval) => void
 }
 
+/** The AI always analyses 15-minute candles (6-hour forecast), independent of chart timeframe. */
+export const AI_INTERVAL: Interval = '15m'
+
 export const useMarket = create<MarketState>(() => ({
   exchange: (localStorage.getItem('sola.exchange') as ExchangeId) || 'binance',
   source: 'binance',
-  interval: (localStorage.getItem('sola.interval') as Interval) || '15m',
+  interval: AI_INTERVAL,
   status: 'idle',
   candles: [],
   book: null,

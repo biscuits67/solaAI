@@ -36,3 +36,22 @@ export function AnimatedNumber({ value, format = (v) => v.toFixed(2), duration =
     </span>
   )
 }
+
+/** Live price: no rolling digits, just a short colour flash on change. */
+export function Ticker({ value, format, className = '' }: { value: number; format: (v: number) => string; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const prev = useRef(value)
+  useEffect(() => {
+    const el = ref.current
+    if (el && value !== prev.current) {
+      const c = value > prev.current ? 'var(--long)' : 'var(--short)'
+      el.animate([{ color: c }, { color: '' }], { duration: 700, easing: 'cubic-bezier(0.2,0,0,1)' })
+    }
+    prev.current = value
+  }, [value])
+  return (
+    <span ref={ref} className={className}>
+      {format(value)}
+    </span>
+  )
+}

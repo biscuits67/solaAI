@@ -15,7 +15,7 @@ interface UIState {
   mode: Mode
   tab: Tab
   walletOpen: boolean
-  sheet: null | 'buy' | 'sell' | 'settings' | 'session'
+  sheet: null | 'buy' | 'sell' | 'settings' | 'session' | 'help'
   tutorialOpen: boolean
   welcomeOpen: boolean
   welcomeStep: 'choose' | 'warn'
@@ -73,3 +73,6 @@ export function toast(title: string, body?: string, kind: ToastKind = 'info') {
   useUI.setState((s) => ({ toasts: [...s.toasts, { id, title, body, kind }].slice(-4) }))
   setTimeout(() => useUI.getState().dismiss(id), 4200)
 }
+
+/** While an AI session runs, individual bot trades don't raise toasts — the session report summarises them. */
+export const toastMute = { bot: false }

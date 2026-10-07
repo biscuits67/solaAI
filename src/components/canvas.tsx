@@ -597,13 +597,13 @@ export function NeuralCore({
         ctx.arc(xi, y, 2.5 + Math.abs(v) * 2, 0, Math.PI * 2)
         ctx.fill()
         ctx.textAlign = 'right'
-        ctx.font = `500 ${compact ? 10.5 : 12}px "Geist Variable", sans-serif`
-        ctx.fillStyle = 'rgba(245,244,252,0.85)'
+        ctx.font = `500 ${compact ? 11.5 : 13.5}px "Geist Variable", sans-serif`
+        ctx.fillStyle = 'rgba(245,246,248,0.96)'
         ctx.fillText(inputs[i].label, xi - 16, y - (compact ? 0 : 6))
         if (!compact) {
-          ctx.font = '500 10.5px "Geist Mono Variable", monospace'
+          ctx.font = '500 11.5px "Geist Mono Variable", monospace'
           ctx.fillStyle = c
-          ctx.fillText(`${v > 0 ? '+' : ''}${(v * 100).toFixed(0)}`, xi - 16, y + 8)
+          ctx.fillText(`${v > 0 ? '+' : ''}${(v * 100).toFixed(0)}`, xi - 16, y + 9)
         }
       }
 
@@ -666,8 +666,8 @@ export function NeuralCore({
 
       // column captions
       if (!compact) {
-        ctx.font = '500 9.5px "Geist Mono Variable", monospace'
-        ctx.fillStyle = 'rgba(232,230,255,0.3)'
+        ctx.font = '500 10.5px "Geist Mono Variable", monospace'
+        ctx.fillStyle = 'rgba(232,230,255,0.45)'
         ctx.textAlign = 'center'
         ctx.fillText('HIDDEN LAYER', xh, h - 6)
         ctx.fillText('OUTPUT', xo, h - 6)
@@ -686,30 +686,68 @@ export function PriceLine({
   forecast,
   height = 240,
   color = '#7c5cff',
+  axis = false,
+  dataKey = '',
 }: {
   points: { t: number; v: number }[]
   forecast?: { t: number; v: number; lo: number; hi: number }[]
   height?: number
   color?: string
+  axis?: boolean
+  dataKey?: string
 }) {
   const prog = useRef(0)
+  const lastKey = useRef(dataKey)
   const hover = useRef<number | null>(null)
+  if (lastKey.current !== dataKey) {
+    lastKey.current = dataKey
+    prog.current = 0
+  }
   const ref = useCanvas(
     (ctx, w, h) => {
       if (points.length < 2) return
-      const [p, moving] = approach(prog.current, 1, 0.07)
+      const [p, moving] = approach(prog.current, 1, 0.075)
       prog.current = p
       const fc = forecast ?? []
       const n = points.length + Math.max(0, fc.length - 1)
       const vals = [...points.map((x) => x.v), ...fc.flatMap((f) => [f.lo, f.hi])]
-      const mn = Math.min(...vals)
-      const mx = Math.max(...vals)
-      const pad = (mx - mn) * 0.08 || 1
-      const top = 8
-      const bot = h - 22
-      const X = (i: number) => (i / (n - 1)) * (w - 8)
+      let mn = Math.min(...vals)
+      let mx = Math.max(...vals)
+      if (mx - mn < Math.abs(mx) * 0.002) {
+        mn -= Math.abs(mx) * 0.002 + 1
+        mx += Math.abs(mx) * 0.002 + 1
+      }
+      const pad = (mx - mn) * 0.08
+      const top = 10
+      const bot = h - 24
+      const right = axis ? 58 : 8
+      const W = w - right
+      const X = (i: number) => (i / (n - 1)) * W
       const Y = (v: number) => bot - ((v - mn + pad) / (mx - mn + pad * 2)) * (bot - top)
       const k = Math.max(2, Math.floor(points.length * p))
+
+      // price axis + grid
+      if (axis) {
+        ctx.font = '500 11px "Geist Mono Variable", monospace'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        const liveY = Y(points.at(-1)!.v)
+        for (let j = 0; j < 4; j++) {
+          const v = mn - pad + ((mx - mn + pad * 2) * (j + 0.5)) / 4
+          const y = Y(v)
+          if (Math.abs(y - liveY) < 16) continue
+          ctx.strokeStyle = 'rgba(255,255,255,0.045)'
+          ctx.setLineDash([2, 4])
+          ctx.beginPath()
+          ctx.moveTo(0, y)
+          ctx.lineTo(W, y)
+          ctx.stroke()
+          ctx.setLineDash([])
+          ctx.fillStyle = 'rgba(160,163,176,0.85)'
+          ctx.fillText(v >= 1000 ? v.toFixed(0) : v.toFixed(2), W + 10, y)
+        }
+        ctx.textBaseline = 'alphabetic'
+      }
 
       // forecast band + line
       if (fc.length > 1 && p > 0.98) {
@@ -718,27 +756,27 @@ export function PriceLine({
         fc.forEach((f, i) => (i ? ctx.lineTo(X(o + i), Y(f.hi)) : ctx.moveTo(X(o), Y(f.hi))))
         for (let i = fc.length - 1; i >= 0; i--) ctx.lineTo(X(o + i), Y(fc[i].lo))
         ctx.closePath()
-        const bg = ctx.createLinearGradient(X(o), 0, w, 0)
-        bg.addColorStop(0, 'rgba(20,241,149,0.02)')
-        bg.addColorStop(1, 'rgba(20,241,149,0.14)')
+        const bg = ctx.createLinearGradient(X(o), 0, W, 0)
+        bg.addColorStop(0, 'rgba(25,251,155,0.02)')
+        bg.addColorStop(1, 'rgba(25,251,155,0.13)')
         ctx.fillStyle = bg
         ctx.fill()
         ctx.setLineDash([5, 5])
         ctx.beginPath()
         fc.forEach((f, i) => (i ? ctx.lineTo(X(o + i), Y(f.v)) : ctx.moveTo(X(o), Y(f.v))))
-        ctx.strokeStyle = '#14f195'
+        ctx.strokeStyle = '#19fb9b'
         ctx.lineWidth = 2
         ctx.stroke()
         ctx.setLineDash([])
-        ctx.font = '600 10.5px "Geist Variable", sans-serif'
-        ctx.fillStyle = '#14f195'
+        ctx.font = '600 11px "Geist Variable", sans-serif'
+        ctx.fillStyle = '#19fb9b'
         ctx.textAlign = 'right'
-        ctx.fillText('AI forecast', w - 8, Y(fc.at(-1)!.hi) - 8)
+        ctx.fillText('AI forecast', W - 4, Math.max(top + 10, Y(fc.at(-1)!.hi) - 8))
       }
 
-      // area
+      // area + line
       const g = ctx.createLinearGradient(0, top, 0, bot)
-      g.addColorStop(0, color + '44')
+      g.addColorStop(0, color + '40')
       g.addColorStop(1, color + '00')
       ctx.beginPath()
       for (let i = 0; i < k; i++) i ? ctx.lineTo(X(i), Y(points[i].v)) : ctx.moveTo(X(i), Y(points[i].v))
@@ -750,27 +788,42 @@ export function PriceLine({
       ctx.beginPath()
       for (let i = 0; i < k; i++) i ? ctx.lineTo(X(i), Y(points[i].v)) : ctx.moveTo(X(i), Y(points[i].v))
       ctx.strokeStyle = color
-      ctx.lineWidth = 2.2
+      ctx.lineWidth = 2
       ctx.lineJoin = 'round'
       ctx.stroke()
 
-      // live dot
       const lx = X(k - 1)
       const ly = Y(points[k - 1].v)
       ctx.fillStyle = color
       ctx.beginPath()
-      ctx.arc(lx, ly, 4.5, 0, Math.PI * 2)
+      ctx.arc(lx, ly, 4, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = color + '55'
+      ctx.strokeStyle = color + '50'
       ctx.lineWidth = 6
       ctx.beginPath()
       ctx.arc(lx, ly, 8, 0, Math.PI * 2)
       ctx.stroke()
 
+      // live price tag on the axis
+      if (axis && p > 0.98) {
+        const v = points.at(-1)!.v
+        const y = Y(v)
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.roundRect(W + 4, y - 10, 54, 20, 6)
+        ctx.fill()
+        ctx.fillStyle = '#fff'
+        ctx.font = '600 11px "Geist Mono Variable", monospace'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(v >= 1000 ? v.toFixed(0) : v.toFixed(2), W + 9, y + 0.5)
+        ctx.textBaseline = 'alphabetic'
+      }
+
       // hover
       const hx = hover.current
-      if (hx != null && p > 0.98) {
-        const i = Math.max(0, Math.min(points.length - 1, Math.round((hx / (w - 8)) * (n - 1))))
+      if (hx != null && p > 0.98 && hx <= W) {
+        const i = Math.max(0, Math.min(points.length - 1, Math.round((hx / W) * (n - 1))))
         const x = X(i)
         const y = Y(points[i].v)
         ctx.strokeStyle = 'rgba(255,255,255,0.18)'
@@ -784,36 +837,41 @@ export function PriceLine({
         ctx.arc(x, y, 4, 0, Math.PI * 2)
         ctx.fill()
         const d = new Date(points[i].t * 1000)
-        const label = `$${points[i].v.toFixed(2)} · ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-        ctx.font = '600 11px "Geist Variable", sans-serif'
-        const tw = ctx.measureText(label).width + 18
-        const bx = Math.min(Math.max(x - tw / 2, 0), w - tw)
-        ctx.fillStyle = '#f4f5f7'
+        const label = `$${points[i].v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+        ctx.font = '600 11.5px "Geist Variable", sans-serif'
+        const tw = ctx.measureText(label).width + 20
+        const bx = Math.min(Math.max(x - tw / 2, 0), W - tw)
+        ctx.fillStyle = '#f5f6f8'
         ctx.beginPath()
-        ctx.roundRect(bx, top, tw, 24, 12)
+        ctx.roundRect(bx, top, tw, 26, 13)
         ctx.fill()
-        ctx.fillStyle = '#0c0d12'
+        ctx.fillStyle = '#08090c'
         ctx.textAlign = 'left'
         ctx.textBaseline = 'middle'
-        ctx.fillText(label, bx + 9, top + 12.5)
+        ctx.fillText(label, bx + 10, top + 13.5)
         ctx.textBaseline = 'alphabetic'
       }
 
-      // time axis
-      ctx.font = '500 10px "Geist Variable", sans-serif'
-      ctx.fillStyle = 'rgba(139,141,152,0.8)'
-      ctx.textAlign = 'center'
+      // time axis (deduplicated labels)
+      ctx.font = '500 11px "Geist Variable", sans-serif'
+      ctx.fillStyle = 'rgba(160,163,176,0.85)'
+      const span = points.at(-1)!.t - points[0].t
+      const fmt = (t: number) => {
+        const d = new Date(t * 1000)
+        return span > 2 * 86400 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      }
+      let lastTxt = ''
       for (let j = 0; j < 4; j++) {
         const i = Math.floor((j / 3) * (points.length - 1))
-        const d = new Date(points[i].t * 1000)
-        const span = points.at(-1)!.t - points[0].t
-        const txt = span > 2 * 86400 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        const txt = fmt(points[i].t)
+        if (txt === lastTxt) continue
+        lastTxt = txt
         ctx.textAlign = j === 0 ? 'left' : j === 3 ? 'right' : 'center'
-        ctx.fillText(txt, X(i), h - 4)
+        ctx.fillText(txt, X(i), h - 5)
       }
       return moving
     },
-    [points, forecast, color],
+    [points, forecast, color, axis, dataKey],
   )
   return (
     <canvas

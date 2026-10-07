@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { toast } from './ui'
+import { toast, toastMute } from './ui'
+import { money } from '../lib/money'
 
 export type Side = 'long' | 'short'
 export type Source = 'manual' | 'bot' | 'copilot'
@@ -110,7 +111,7 @@ export const useTrading = create<TradingState>()(
         const fee = notional * TAKER
         if (margin <= 0 || !price) return null
         if (margin + fee > s.balance + 1e-9) {
-          toast('Insufficient funds', `Need ${(margin + fee).toFixed(2)} USDT`, 'error')
+          toast('Insufficient funds', `Need ${money(margin + fee)}`, 'error')
           return null
         }
         const pos: Position = {
@@ -127,9 +128,9 @@ export const useTrading = create<TradingState>()(
           source,
         }
         set({ balance: s.balance - margin - fee, positions: [pos, ...s.positions] })
-        toast(
+        if (!(source === 'bot' && toastMute.bot)) toast(
           `${sideRu(side)} opened`,
-          `${pos.size.toFixed(3)} SOL at ${price.toFixed(2)} · x${leverage}`,
+          `${money(margin, { d: 0 })}${leverage > 1 ? ` · ${leverage}x boost` : ''} at ${money(price)}`,
           side === 'long' ? 'long' : 'short',
         )
         return pos
@@ -138,7 +139,7 @@ export const useTrading = create<TradingState>()(
       placeLimit: ({ side, margin, leverage, price, sl = null, tp = null, source = 'manual' }) => {
         const s = get()
         if (margin > s.balance) {
-          toast('Insufficient funds', `Need ${margin.toFixed(2)} USDT`, 'error')
+          toast('Insufficient funds', `Need ${money(margin)}`, 'error')
           return
         }
         const o: LimitOrder = { id: uid(), side, price, margin, leverage, sl, tp, createdAt: Date.now(), source }
@@ -181,9 +182,9 @@ export const useTrading = create<TradingState>()(
           positions: s.positions.filter((x) => x.id !== id),
           history: [tr, ...s.history].slice(0, 300),
         })
-        toast(
+        if (!(p.source === 'bot' && toastMute.bot)) toast(
           `${reason}: ${sideRu(p.side).toLowerCase()} closed`,
-          `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT`,
+          money(pnl, { sign: true }),
           pnl >= 0 ? 'long' : 'short',
         )
       },
@@ -244,7 +245,7 @@ export const useTrading = create<TradingState>()(
 
       reset: (balance = START_BALANCE) => {
         set({ balance, positions: [], orders: [], history: [], equityCurve: [{ t: Date.now(), v: balance }] })
-        toast('Demo account reset', `Balance ${balance.toLocaleString('en-US')} USDT`, 'info')
+        toast('Demo account reset', `Balance ${money(balance)}`, 'info')
       },
     }),
     { name: 'sola.demo.v1', partialize: (s) => ({ ...s, lastPrice: 0 }) },

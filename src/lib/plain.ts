@@ -22,14 +22,15 @@ export function horizon(interval: Interval, bars = 24) {
   return `${Math.round(s / 86400)} days`
 }
 
-export function headline(s: Signal, interval: Interval) {
+export function headline(s: Signal, _interval?: Interval) {
   const last = s.forecast.at(-1)!
-  const ch = ((last.value - s.price) / s.price) * 100
-  const agree = s.factors.filter((f) => Math.sign(f.value) === Math.sign(s.score)).length
-  const dir = ch >= 0 ? 'rise' : 'drop'
-  if (s.direction === 'NEUTRAL')
-    return `No clear direction right now. The AI expects SOL to stay around $${last.value.toFixed(2)} over the next ${horizon(interval)} and waits for a better moment.`
-  return `The AI expects SOL to ${dir} about ${Math.abs(ch).toFixed(1)}% in the next ${horizon(interval)}. ${agree} of 9 models agree.`
+  const ch = s.expectedPct
+  if (s.direction === 'NEUTRAL') {
+    if (s.waitReason === 'small-move')
+      return `The AI sees a small move (${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}%) — too small to beat trading fees. It waits for a clearer opportunity.`
+    return `No clear direction right now. The AI expects SOL around $${last.value.toFixed(2)} in 6 hours and waits for a better moment.`
+  }
+  return `The AI expects SOL to ${ch >= 0 ? 'rise' : 'fall'} about ${Math.abs(ch).toFixed(1)}% over the next 6 hours.`
 }
 
 const PLAIN: Record<string, [string, string, string]> = {

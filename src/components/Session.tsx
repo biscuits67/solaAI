@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { fmtUsd } from '../lib/format'
+import { money, pct as pctFmt, tone } from '../lib/money'
 import { useMarket } from '../store/market'
 import { sessionPnl, useSession } from '../store/session'
 import { useUI } from '../store/ui'
@@ -121,7 +122,7 @@ export function SessionLive() {
 function Confetti() {
   const parts = useRef(
     Array.from({ length: 120 }, () => ({
-      x: Math.random(),
+      x: Math.random() < 0.5 ? Math.random() * 0.16 : 0.84 + Math.random() * 0.16,
       y: -Math.random() * 0.6,
       vx: (Math.random() - 0.5) * 0.004,
       vy: 0.003 + Math.random() * 0.005,
@@ -148,7 +149,7 @@ function Confetti() {
     }
     return alive
   }, [])
-  return <canvas ref={ref} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 3 }} />
+  return <canvas ref={ref} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} />
 }
 
 export function SessionResult() {
@@ -171,8 +172,8 @@ export function SessionResult() {
             transition={{ duration: 0.6, ease: EASE }}
             style={{ position: 'relative', overflow: 'hidden' }}
           >
-            {win && r.pnl > 0 && <Confetti />}
             <div className={`result-glow ${win ? 'up' : 'down'}`} />
+            {win && r.pnl > 0 && <Confetti />}
             <div style={{ position: 'relative', zIndex: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <SolanaLogo size={42} />
@@ -183,17 +184,15 @@ export function SessionResult() {
                   </div>
                 </div>
               </div>
+              {r.stoppedByLimit && <div className="limit-note">The session stopped early: it reached the max-loss limit you saw before starting.</div>}
               <div className="lab" style={{ marginTop: 26 }}>
-                {win ? 'You earned' : 'Session result'}
+                {r.pnl > 0.005 ? 'You earned' : 'Session result'}
               </div>
-              <div className="big-num" style={{ fontSize: 54, marginTop: 6, color: win ? 'var(--long)' : 'var(--short)' }}>
+              <div className={`big-num ${tone(r.pnl)}`} style={{ fontSize: 54, marginTop: 6 }}>
                 <AnimatedNumber value={r.pnl} format={(v) => `${v >= 0 ? '+' : '−'}${fmtUsd(Math.abs(v))}`} duration={1.6} />
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-                <span className={win ? 'chip-up' : 'chip-down'}>
-                  {pct >= 0 ? '+' : ''}
-                  {pct.toFixed(2)}%
-                </span>
+                <span className={`chip-${tone(r.pnl)}`}>{pctFmt(pct)}</span>
                 <span className="sol-hint" style={{ fontSize: 13 }}>
                   ≈ {r.pnl >= 0 ? '+' : '−'}
                   {Math.abs(r.pnl / r.price).toFixed(3)} SOL
@@ -220,7 +219,15 @@ export function SessionResult() {
                 </div>
                 <div>
                   <div className="lab">Best trade</div>
-                  <b style={{ color: 'var(--long)' }}>+{fmtUsd(r.best)}</b>
+                  <b className={r.best > 0 ? 'up' : ''}>{r.best > 0 ? `+${fmtUsd(r.best)}` : '—'}</b>
+                </div>
+                <div>
+                  <div className="lab">Realised profit</div>
+                  <b>{money(r.realised, { sign: true })}</b>
+                </div>
+                <div>
+                  <div className="lab">Fees paid</div>
+                  <b>{money(r.fees)}</b>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>

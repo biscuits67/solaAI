@@ -32,8 +32,8 @@ function ArtBalance({ real }: { real: boolean }) {
         </div>
         <span className="sol-hint">{real ? `min. $${MIN_REAL_USD} to trade` : '≈ 59.4 SOL'}</span>
         <div className="tut-acts">
-          {['Start AI', 'Buy', 'Sell', 'More'].map((t, i) => (
-            <span key={t} className={i === 0 ? 'hl' : ''}>
+          {['Buy', 'Sell', 'History', 'Settings'].map((t, i) => (
+            <span key={t} className={i === -1 ? 'hl' : ''}>
               <i />
               {t}
             </span>
@@ -150,12 +150,12 @@ export function Tutorial() {
     },
     {
       title: 'Read the AI signal',
-      text: 'The big card tells you what the AI thinks right now — Buy, Sell or Wait — and how confident it is. The white bars show confidence.',
+      text: 'The big card tells you what the AI thinks right now — Buy, Sell or Wait — and how confident it is. Tap any (?) to see what a word means.',
       art: <ArtSignal />,
     },
     {
       title: 'Start an AI session',
-      text: 'Press “Start AI” and pick 1, 5 or 10 minutes. The AI trades on its own with an automatic safety stop. You can end it any time.',
+      text: 'In the big card at the top, pick 1, 5 or 10 minutes and press Start. Before you start, you see how much the AI may use and the most it can lose. You can end it any time.',
       art: <ArtSession />,
     },
     {

@@ -3,7 +3,7 @@ import { useBot } from './bot'
 import { useMarket } from './market'
 import { think } from './thoughts'
 import { equityOf, useTrading, type Side } from './trading'
-import { toast } from './ui'
+import { toast, toastMute } from './ui'
 
 /**
  * Timed AI trading sessions (1 / 5 / 10 min).
@@ -21,6 +21,9 @@ export interface SessionResult {
   trades: number
   wins: number
   best: number
+  fees: number
+  realised: number
+  stoppedByLimit: boolean
   samples: { t: number; v: number }[]
   price: number
 }
@@ -43,6 +46,7 @@ interface Active {
   plan: Planned[]
   samples: { t: number; v: number }[]
   prevThreshold: number
+  maxLoss: number
 }
 
 interface S {
@@ -77,19 +81,31 @@ export const useSession = create<S>((set, get) => ({
       }
     }
     set({
-      active: { minutes, startedAt: now, endsAt: now + minutes * 60_000, startEquity, scripted, plan, samples: [{ t: now, v: startEquity }], prevThreshold: bot.threshold },
+      active: {
+        minutes,
+        startedAt: now,
+        endsAt: now + minutes * 60_000,
+        startEquity,
+        scripted,
+        plan,
+        samples: [{ t: now, v: startEquity }],
+        prevThreshold: bot.threshold,
+        maxLoss: sessionPlan(minutes, startEquity, bot.riskPct).maxLoss,
+      },
       result: null,
     })
     if (!scripted) bot.set({ threshold: Math.min(bot.threshold, 20) })
-    if (!bot.enabled) bot.toggle()
+    toastMute.bot = true
+    if (!bot.enabled) bot.toggle(true)
+    toast(`${minutes}-minute AI session started`, 'You can end it at any time', 'long')
     think('BOT', `AI session started for ${minutes} minute${minutes > 1 ? 's' : ''}.`, 'bull')
   },
 
-  stop: () => finish(),
+  stop: () => finish(false),
   dismiss: () => set({ result: null }),
 }))
 
-function finish() {
+function finish(byLimit = false) {
   const s = useSession.getState().active
   if (!s) return
   const tr = useTrading.getState()
@@ -100,8 +116,9 @@ function finish() {
     if (planned) closeScripted(planned, p.id)
     else useTrading.getState().closePosition(p.id, price, 'Session ended')
   }
+  toastMute.bot = false
   const bot = useBot.getState()
-  if (bot.enabled) bot.toggle()
+  if (bot.enabled) bot.toggle(true)
   bot.set({ threshold: s.prevThreshold })
   const endEquity = eq()
   const trades = useTrading.getState().history.filter((h) => h.source === 'bot' && h.closedAt >= s.startedAt)
@@ -118,6 +135,9 @@ function finish() {
       trades: trades.length,
       wins: trades.filter((t) => t.pnl > 0).length,
       best: Math.max(0, ...trades.map((t) => t.pnl)),
+      fees: trades.reduce((a, t) => a + t.fees, 0),
+      realised: trades.reduce((a, t) => a + t.pnl, 0),
+      stoppedByLimit: byLimit,
       samples: [...s.samples, { t: now, v: endEquity }],
       price,
     },
@@ -145,7 +165,7 @@ export function sessionTick() {
     for (const pl of s.plan) {
       if (!pl.posId && now >= pl.openAt) {
         const balance = useTrading.getState().balance
-        const pos = useTrading.getState().openMarket({ side: pl.side, margin: Math.min(balance * 0.25, balance - 10), leverage: 5, source: 'bot' }, price)
+        const pos = useTrading.getState().openMarket({ side: pl.side, margin: Math.min(balance * 0.3, balance - 10), leverage: 2, source: 'bot' }, price)
         pl.posId = pos?.id ?? 'failed'
         if (pos) useBot.getState().log(`${pl.side === 'long' ? 'Bought' : 'Sold'} ${pos.size.toFixed(2)} SOL at $${price.toFixed(2)} — strong short-term signal`, 'open')
       } else if (pl.posId && pl.posId !== 'failed' && !pl.done && now >= pl.closeAt) {
@@ -169,13 +189,25 @@ export function sessionTick() {
         }
     useSession.setState({ active: { ...s, samples: [...s.samples, { t: now, v }] } })
   }
-  if (now >= s.endsAt) {
-    finish()
-    toast('Session complete', 'See your results', 'long')
+  if (!s.scripted && s.startEquity - eq() >= s.maxLoss) {
+    finish(true)
+    return
   }
+  if (now >= s.endsAt) finish()
 }
 
 /** Live (smoothed) session P&L for the UI. */
 export function sessionPnl(s: Active) {
   return (s.samples.at(-1)?.v ?? s.startEquity) - s.startEquity
+}
+
+/** What a session may use and lose — shown before the user starts it. */
+export function sessionPlan(minutes: number, equity: number, riskPct: number) {
+  const scripted = minutes === 1
+  const usesPct = scripted ? 30 : 50
+  const uses = (equity * usesPct) / 100
+  const trades = scripted ? 5 : minutes === 5 ? 3 : 4
+  const maxLoss = equity * Math.min(0.15, (riskPct * 2) / 100)
+  const fees = uses * 2 * 0.001 * trades
+  return { usesPct, uses, maxLoss, fees, trades }
 }

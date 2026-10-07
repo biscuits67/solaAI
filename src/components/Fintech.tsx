@@ -1,23 +1,24 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { EXCHANGES } from '../data/exchanges'
 import type { Interval } from '../data/types'
 import { STRATEGIES, type StrategyId } from '../lib/ai'
-import { fmtPrice, fmtSigned, fmtUsd } from '../lib/format'
-import { action, confidenceWord, headline, horizon, mood, plainFactor } from '../lib/plain'
+import { money, pct, tone } from '../lib/money'
+import { DUR, EASE, isIntro, SPRING } from '../lib/motion'
+import { action, confidenceWord, headline, mood, plainFactor } from '../lib/plain'
 import { useBot } from '../store/bot'
+import { useCandles } from '../store/candles'
 import { useMarket } from '../store/market'
+import { sessionPlan, useSession } from '../store/session'
 import { useSignal } from '../store/signal'
 import { equityOf, START_BALANCE, upnl, useTrading, type Side } from '../store/trading'
 import { toast, useUI, type Tab } from '../store/ui'
-import { AnimatedNumber } from './AnimatedNumber'
+import { AnimatedNumber, Ticker } from './AnimatedNumber'
 import { PriceLine } from './canvas'
+import { Icon, type IconName } from './Icon'
+import { SessionLive, Sol } from './Session'
 import { MIN_REAL_USD, ModeSwitch, VenuePicker } from './Shell'
 import { SolanaLogo } from './SolanaLogo'
-import { Icon, type IconName } from './Icon'
-import { SessionLive, SessionSheet, Sol } from './Session'
-import { useSession } from '../store/session'
-
-const EASE = [0.22, 1, 0.36, 1] as const
 
 export const TABS: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -43,13 +44,14 @@ export function Card({
   right?: ReactNode
   style?: React.CSSProperties
 }) {
+  const intro = isIntro()
   return (
     <motion.section
       className={`card ${className}`}
       style={style}
-      initial={{ opacity: 0, y: 22 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay, ease: EASE }}
+      initial={intro ? { opacity: 0, y: 18, filter: 'blur(6px)' } : { opacity: 0 }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={intro ? { duration: 0.7, delay, ease: EASE.emphasized } : { duration: DUR.ui, ease: EASE.standard }}
     >
       {(title || right) && (
         <div className="card-h">
@@ -62,124 +64,142 @@ export function Card({
   )
 }
 
-/* ───────────── header ───────────── */
+/** Small (?) bubble that explains a term on hover / tap. */
+export function Hint({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false)
+    window.addEventListener('pointerdown', h)
+    return () => window.removeEventListener('pointerdown', h)
+  }, [open])
+  return (
+    <span ref={ref} className="hint" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button type="button" className="hint-q" aria-label="What does this mean?" onClick={() => setOpen((o) => !o)}>
+        ?
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.span
+            className="hint-pop"
+            role="tooltip"
+            initial={{ opacity: 0, y: 4, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: DUR.ui, ease: EASE.standard }}
+          >
+            {children}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </span>
+  )
+}
+
+export const TERMS = {
+  confidence: 'How sure the AI is about its call, from 0 to 100%. Above 70% is high. It is never a guarantee.',
+  target: 'The price where the AI takes profit automatically.',
+  stop: 'The price where the AI exits automatically to limit a loss. It protects your balance if the market goes the other way.',
+  expected: 'Where the AI expects SOL to be in 6 hours, based on its forecast.',
+  sell: '“Sell” means a short position: you make money if the price goes down — you do not need to own SOL.',
+  boost: 'Boost (leverage) multiplies the position size. 2x means a 1% price move becomes a 2% gain or loss on the money you put in.',
+  session: 'A session lets the AI trade on its own for a fixed time. It ends automatically and shows you a report.',
+  maxLoss: 'If the session loses this much, the AI stops trading immediately.',
+  mood: 'A one-word summary of the AI score: from very cautious to very optimistic.',
+}
+
+/* ───────────── header & status ───────────── */
 
 export function Header() {
-  const { tab, setTab } = useUI()
+  const { tab, setTab, setSheet } = useUI()
   return (
-    <motion.header className="fx-top" initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: EASE }}>
+    <header className="fx-top">
       <div className="fx-logo">
         <SolanaLogo size={36} />
         Solana AI
         <span className="ver">BETA</span>
       </div>
-      <nav className="fx-nav">
+      <nav className="fx-nav" aria-label="Main">
         {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            {tab === t.id && <motion.div layoutId="fx-nav" className="pill" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)} aria-current={tab === t.id ? 'page' : undefined}>
+            {tab === t.id && <motion.div layoutId="fx-nav" className="pill" transition={SPRING} />}
             <span>{t.label}</span>
           </button>
         ))}
       </nav>
       <div className="fx-right">
+        <button className="icon-btn" aria-label="Help" onClick={() => setSheet('help')}>
+          ?
+        </button>
         <VenuePicker />
         <ModeSwitch />
       </div>
-    </motion.header>
+    </header>
   )
 }
 
 export function StatusBar() {
   const { price, ticker, source, status } = useMarket()
-  const signal = useSignal((s) => s.signal)
+  const mode = useUI((s) => s.mode)
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
   const ch = ticker?.changePct ?? 0
+  const offline = source === 'sim'
+  const live = status === 'live'
   return (
     <div className="fx-status">
-      <span className="ok">
-        <i style={status === 'live' ? undefined : { background: 'var(--amber)', boxShadow: '0 0 8px var(--amber)' }} />
-        {status === 'live' ? 'All systems operational' : 'Connecting…'}
+      <span className={`state ${offline ? 'warn' : live ? 'ok' : 'warn'}`}>
+        <i />
+        {offline ? 'Offline simulator · exchanges unreachable from your network' : live ? `Live · ${EXCHANGES[source].name}` : 'Connecting…'}
       </span>
       <span className="sep" />
       <span>
-        SOL <b>${fmtPrice(price)}</b> <b style={{ color: ch >= 0 ? 'var(--long)' : 'var(--short)' }}>{fmtSigned(ch)}%</b>
+        SOL <Ticker className="num" value={price} format={(v) => money(v)} /> <b className={tone(ch)}>{pct(ch)}</b>
       </span>
       <span className="sep hide-sm" />
       <span className="hide-sm">
-        24h volume <b>${ticker ? (ticker.quoteVolume24h / 1e6).toFixed(1) : '—'}M</b>
+        24h volume <b>{ticker ? `$${(ticker.quoteVolume24h / 1e6).toFixed(1)}M` : '—'}</b>
       </span>
       <div className="right">
+        {mode === 'real' && <span className="state real">Real mode · wallet required (min ${MIN_REAL_USD})</span>}
         <span>
-          AI engine <b>{signal ? `${signal.confidence}% conf.` : 'warming up'}</b>
-        </span>
-        <span>
-          Feed <b>{source}</b>
-        </span>
-        <span>
-          <b>{new Date(now).toLocaleTimeString('en-US', { hour12: false })}</b> UTC{-new Date().getTimezoneOffset() / 60 >= 0 ? '+' : ''}
-          {-new Date().getTimezoneOffset() / 60}
+          <b>{new Date(now).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</b>
         </span>
       </div>
     </div>
   )
 }
 
-export function Footer() {
-  const setTab = useUI((s) => s.setTab)
-  const setTutorialOpen = useUI((s) => s.setTutorialOpen)
-  return (
-    <footer>
-      <div className="fx-foot">
-        <div>
-          <div className="fx-logo">
-            <SolanaLogo size={30} />
-            Solana AI
-          </div>
-          <p>Neural trading engine for Solana. Nine AI models read live market data from leading exchanges every second.</p>
-        </div>
-        <div>
-          <h5>Product</h5>
-          <a onClick={() => setTab('home')}>Overview</a>
-          <a onClick={() => setTab('activity')}>Activity</a>
-          <a onClick={() => setTab('performance')}>Performance</a>
-          <a onClick={() => setTab('how')}>How AI decides</a>
-        </div>
-        <div>
-          <h5>Resources</h5>
-          <a onClick={() => setTutorialOpen(true)}>Getting started</a>
-          <a onClick={() => setTab('how')}>AI methodology</a>
-          <a onClick={() => setTab('performance')}>Backtesting</a>
-        </div>
-        <div>
-          <h5>Market data</h5>
-          <a>Binance</a>
-          <a>Bybit</a>
-          <a>OKX</a>
-        </div>
-      </div>
-      <div className="fx-legal">
-        <span>© {new Date().getFullYear()} Solana AI. All rights reserved.</span>
-        <span>Charts by TradingView Lightweight Charts™ · Trading involves risk. Not financial advice.</span>
-      </div>
-    </footer>
-  )
-}
-
 export function MobileNav() {
   const { tab, setTab } = useUI()
   return (
-    <nav className="fx-mnav">
+    <nav className="fx-mnav" aria-label="Main">
       {TABS.map((t) => (
         <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-          {tab === t.id && <motion.div layoutId="fx-mnav" className="pill" />}
+          {tab === t.id && <motion.div layoutId="fx-mnav" className="pill" transition={SPRING} />}
           <span>{t.id === 'how' ? 'How AI' : t.label}</span>
         </button>
       ))}
     </nav>
+  )
+}
+
+export function Footer() {
+  const setSheet = useUI((s) => s.setSheet)
+  return (
+    <footer className="fx-slim">
+      <span>© {new Date().getFullYear()} Solana AI · Beta</span>
+      <span className="links">
+        <a onClick={() => setSheet('help')}>Help & glossary</a>
+        <a onClick={() => useUI.getState().setTab('how')}>Methodology</a>
+        <a onClick={() => useUI.getState().setTutorialOpen(true)}>Tutorial</a>
+      </span>
+      <span>Charts by TradingView Lightweight Charts™ · Trading involves risk. Not financial advice.</span>
+    </footer>
   )
 }
 
@@ -191,7 +211,7 @@ export function useEquity() {
   return equityOf(t, price)
 }
 
-function useGuard() {
+export function useGuard() {
   const mode = useUI((s) => s.mode)
   const setWalletOpen = useUI((s) => s.setWalletOpen)
   return (fn: () => void) => {
@@ -204,84 +224,244 @@ function useGuard() {
   }
 }
 
+/* ───────────── HERO: signal + start ───────────── */
+
+const DURATIONS = [1, 5, 10]
+
+export function Hero({ delay = 0 }: { delay?: number }) {
+  const signal = useSignal((s) => s.signal)
+  const interval = useMarket((s) => s.interval)
+  const mode = useUI((s) => s.mode)
+  const session = useSession()
+  const bot = useBot()
+  const eq = useEquity()
+  const guard = useGuard()
+  const [minutes, setMinutes] = useState(1)
+  const dir = signal?.direction ?? 'NEUTRAL'
+  const running = mode === 'demo' && (!!session.active || bot.enabled)
+  const plan = sessionPlan(minutes, eq, bot.riskPct)
+  const segs = signal ? Math.max(1, Math.round(signal.confidence / 20)) : 0
+  const sp = signal?.plan
+  const inSession = !!session.active && mode === 'demo'
+  const title = inSession ? 'AI is trading' : signal ? action(signal) : 'Reading the market…'
+
+  // brief ring burst when the AI changes its mind
+  const prevDir = useRef(dir)
+  const [flip, setFlip] = useState(0)
+  useEffect(() => {
+    if (signal && prevDir.current !== dir) setFlip((f) => f + 1)
+    prevDir.current = dir
+  }, [dir, signal])
+
+  return (
+    <Card className={`hero sig-card ${inSession ? 'LONG' : dir}`} delay={delay}>
+      <AnimatePresence>
+        {flip > 0 && (
+          <motion.span
+            key={flip}
+            className="flip-ring"
+            initial={{ opacity: 0.6, scale: 0.6 }}
+            animate={{ opacity: 0, scale: 2.4 }}
+            transition={{ duration: 1.1, ease: EASE.emphasized }}
+          />
+        )}
+      </AnimatePresence>
+      <div className="hero-grid">
+        <div className="hero-main">
+          <span className="pill-live">
+            <span className="live-dot" style={{ background: '#fff' }} /> AI signal · updated every second
+          </span>
+          <AnimatePresence mode="wait">
+            <motion.h1
+              key={title}
+              className="big-num sig-title"
+              initial={{ opacity: 0, y: 12, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -12, filter: 'blur(8px)' }}
+              transition={{ duration: DUR.panel, ease: EASE.emphasized }}
+            >
+              {title}
+            </motion.h1>
+          </AnimatePresence>
+          <p className="sig-text">
+            {inSession
+              ? `Your ${session.active!.minutes}-minute session is running. The AI opens and closes positions on its own, each with a safety stop — you can end it at any time.`
+              : signal
+                ? headline(signal, interval)
+                : 'The AI is analysing live SOL data. This takes a few seconds.'}
+          </p>
+          {dir === 'SHORT' && !inSession && (
+            <p className="sig-note">
+              <Icon name="down" size={13} /> Sell = you profit if SOL goes down. You don’t need to own SOL.
+            </p>
+          )}
+          {!inSession && (
+          <div className="hero-metrics">
+            <div>
+              <span>
+                Confidence <Hint>{TERMS.confidence}</Hint>
+              </span>
+              <b>{signal ? `${signal.confidence}%` : '—'}</b>
+              <div className="meter">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <i key={i} className={i < segs ? 'on' : ''} />
+                ))}
+              </div>
+              <small>{signal ? confidenceWord(signal.confidence) : ''}</small>
+            </div>
+            <div>
+              <span>
+                {sp ? 'Target' : 'Expected in 6h'} <Hint>{sp ? TERMS.target : TERMS.expected}</Hint>
+              </span>
+              <b>{signal ? money(sp ? sp.take : signal.forecast.at(-1)!.value) : '—'}</b>
+              <small>{signal ? pct(sp ? ((sp.take - sp.entry) / sp.entry) * 100 : signal.expectedPct) : ''}</small>
+            </div>
+            <div>
+              <span>
+                Safety stop <Hint>{TERMS.stop}</Hint>
+              </span>
+              <b>{sp ? money(sp.stop) : 'No trade'}</b>
+              <small>{sp ? pct(((sp.stop - sp.entry) / sp.entry) * 100) : 'nothing to protect'}</small>
+            </div>
+          </div>
+          )}
+        </div>
+
+        <div className="hero-side">
+          <AnimatePresence mode="wait" initial={false}>
+            {session.active && mode === 'demo' ? (
+              <motion.div key="live" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: DUR.panel, ease: EASE.standard }}>
+                <SessionLive />
+              </motion.div>
+            ) : (
+              <motion.div key="start" className="start-box" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: DUR.panel, ease: EASE.standard }}>
+                <div className="sb-h">
+                  Let the AI trade for you <Hint>{TERMS.session}</Hint>
+                </div>
+                <div className="dur-row" role="radiogroup" aria-label="Session length">
+                  {DURATIONS.map((m) => (
+                    <button key={m} role="radio" aria-checked={minutes === m} className={minutes === m ? 'on' : ''} onClick={() => setMinutes(m)}>
+                      {minutes === m && <motion.span layoutId="dur-pill" className="pill" transition={SPRING} />}
+                      <span>{m} min</span>
+                    </button>
+                  ))}
+                </div>
+                <dl className="risk">
+                  <div>
+                    <dt>Uses up to</dt>
+                    <dd>
+                      {mode === 'demo' ? money(plan.uses, { d: 0 }) : '—'} <small>{plan.usesPct}% of balance</small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>
+                      Max loss <Hint>{TERMS.maxLoss}</Hint>
+                    </dt>
+                    <dd>{mode === 'demo' ? money(plan.maxLoss, { d: 0 }) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Est. fees</dt>
+                    <dd>{mode === 'demo' ? `~${money(plan.fees)}` : '—'}</dd>
+                  </div>
+                </dl>
+                {running ? (
+                  <button className="btn-white stop" onClick={() => bot.toggle()}>
+                    <i className="g-stop" style={{ width: 11, height: 11 }} /> Stop AI bot
+                  </button>
+                ) : (
+                  <button className="btn-white" onClick={() => guard(() => session.start(minutes))}>
+                    <i className="g-play sm" /> Start {minutes}-minute session
+                  </button>
+                )}
+                <div className="sb-foot">{mode === 'demo' ? 'Demo money · stop any time' : `Requires a wallet with at least $${MIN_REAL_USD}`}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 /* ───────────── balance + actions + activity ───────────── */
 
 export function BalanceCard({ delay = 0 }: { delay?: number }) {
   const mode = useUI((s) => s.mode)
   const setSheet = useUI((s) => s.setSheet)
+  const setTab = useUI((s) => s.setTab)
   const setWalletOpen = useUI((s) => s.setWalletOpen)
-  const bot = useBot()
   const eq = useEquity()
   const pnl = eq - START_BALANCE
   const guard = useGuard()
-  const session = useSession()
-  const running = (!!session.active || bot.enabled) && mode === 'demo'
-  const startStop = () => (running ? (session.active ? session.stop() : bot.toggle()) : guard(() => setSheet('session')))
   const whole = Math.floor(eq)
-  const cents = Math.round((eq - whole) * 100)
+  const cents = Math.round((eq - whole) * 100) % 100
+
+  // glow when the balance changes noticeably after a trade
+  const prev = useRef(eq)
+  const [glow, setGlow] = useState<'up' | 'down' | null>(null)
+  useEffect(() => {
+    const d = eq - prev.current
+    prev.current = eq
+    if (Math.abs(d) > 5) {
+      setGlow(d > 0 ? 'up' : 'down')
+      const t = setTimeout(() => setGlow(null), 1200)
+      return () => clearTimeout(t)
+    }
+  }, [Math.round(eq)])
 
   return (
-    <Card delay={delay}>
+    <Card delay={delay} className={glow ? `glow-${glow}` : ''}>
       <div className="lab">{mode === 'demo' ? 'Demo balance' : 'Wallet balance'}</div>
       {mode === 'demo' ? (
         <>
           <div className="big-num bal">
-            <AnimatedNumber value={whole} format={(v) => `$${Math.round(v).toLocaleString('en-US')}`} />
+            <AnimatedNumber value={whole} format={(v) => `$${Math.round(v).toLocaleString('en-US')}`} duration={0.9} />
             <small>.{String(cents).padStart(2, '0')}</small>
           </div>
-          <Sol usd={eq} />
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span className={pnl >= 0 ? 'chip-up' : 'chip-down'}>
-              {fmtSigned(pnl)} $ · {fmtSigned((pnl / START_BALANCE) * 100)}%
+          <div className="bal-sub">
+            <span className={`chip-${tone(pnl)}`}>
+              {money(pnl, { sign: true })} · {pct((pnl / START_BALANCE) * 100)}
             </span>
-            <Sol usd={pnl} signed />
+            <Sol usd={eq} />
           </div>
         </>
       ) : (
         <>
           <div className="big-num bal" style={{ color: 'var(--ink-4)' }}>
-            $—<small>.—</small>
+            $—
           </div>
-          <button className="btn-violet" style={{ marginTop: 14, padding: '12px 22px', fontSize: 14 }} onClick={() => setWalletOpen(true)}>
+          <button className="btn-violet" style={{ marginTop: 14 }} onClick={() => setWalletOpen(true)}>
             Connect wallet
           </button>
         </>
       )}
 
       <div className="acts">
-        <button className={`act main ${running ? 'running' : ''}`} onClick={startStop}>
-          <span className="ic">{running ? <i className="g-stop" /> : <i className="g-play" />}</span>
-          {running ? 'Stop AI' : 'Start AI'}
-        </button>
-        <button className="act" onClick={() => guard(() => setSheet('buy'))}>
-          <span className="ic">
-            <i className="g-plus" />
-          </span>
-          Buy
-        </button>
-        <button className="act" onClick={() => guard(() => setSheet('sell'))}>
-          <span className="ic">
-            <i className="g-minus" />
-          </span>
-          Sell
-        </button>
-        <button className="act" onClick={() => setSheet('settings')}>
-          <span className="ic">
-            <span className="g-dots">
-              <i />
-              <i />
-              <i />
-            </span>
-          </span>
-          More
-        </button>
+        <ActBtn icon="up" label="Buy" onClick={() => guard(() => setSheet('buy'))} />
+        <ActBtn icon="down" label="Sell" onClick={() => guard(() => setSheet('sell'))} />
+        <ActBtn icon="clock" label="History" onClick={() => setTab('activity')} />
+        <ActBtn icon="dots" label="Settings" onClick={() => setSheet('settings')} />
       </div>
 
-      <div className="lab" style={{ margin: '28px 0 6px' }}>
-        AI activity
+      <div className="sub-h">
+        <span>Recent activity</span>
+        <button className="link" onClick={() => setTab('activity')}>
+          See all
+        </button>
       </div>
-      <ActivityRows limit={4} />
+      <ActivityRows limit={4} compact />
     </Card>
+  )
+}
+
+function ActBtn({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+  return (
+    <button className="act" onClick={onClick}>
+      <span className="ic">
+        <Icon name={icon} size={18} />
+      </span>
+      {label}
+    </button>
   )
 }
 
@@ -299,55 +479,65 @@ export function useActivity(): Act[] {
   const price = useMarket((s) => s.price)
   const { positions, history } = useTrading()
   const bot = useBot()
+  const session = useSession((s) => s.active)
   return useMemo(() => {
-    const src = (s: string) => (s === 'bot' ? 'AI bot' : s === 'copilot' ? 'AI copilot' : 'You')
-    const time = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    const src = (s: string) => (s === 'bot' ? 'AI' : s === 'copilot' ? 'AI copilot' : 'You')
+    const time = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    const boost = (l: number) => (l > 1 ? ` · ${l}x boost` : '')
     const items: Act[] = []
     for (const p of positions)
       items.push({
         key: 'p' + p.id,
         tone: 'ai',
         glyph: 'clock',
-        title: `${p.side === 'long' ? 'Holding' : 'Short'} ${p.size.toFixed(2)} SOL`,
-        sub: `${src(p.source)} · opened ${time(p.openedAt)} at $${p.entry.toFixed(2)}`,
+        title: `${p.side === 'long' ? 'Buy' : 'Sell'} position open`,
+        sub: `${money(p.margin, { d: 0 })}${boost(p.leverage)} · ${src(p.source)} · ${time(p.openedAt)}`,
         amount: upnl(p, price),
         t: p.openedAt + 1e12,
       })
-    for (const h of history.slice(0, 30))
+    for (const h of history.slice(0, 40))
       items.push({
         key: 'h' + h.id + h.closedAt,
-        tone: h.pnl >= 0 ? 'up' : 'down',
+        tone: h.pnl > 0.005 ? 'up' : h.pnl < -0.005 ? 'down' : 'flat',
         glyph: h.side === 'long' ? 'up' : 'down',
-        title: `${h.side === 'long' ? 'Bought' : 'Sold'} ${h.size.toFixed(2)} SOL`,
-        sub: `${h.reason} · ${src(h.source)} · ${time(h.closedAt)}`,
+        title: `${h.side === 'long' ? 'Buy' : 'Sell'} · ${h.reason.toLowerCase()}`,
+        sub: `${money((h.size * h.entry) / h.leverage, { d: 0 })}${boost(h.leverage)} · ${src(h.source)} · ${time(h.closedAt)}`,
         amount: h.pnl,
         t: h.closedAt,
       })
-    if (bot.enabled && !positions.some((p) => p.source === 'bot'))
-      items.push({ key: 'wait', tone: 'flat', glyph: 'dots', title: 'Waiting for a good entry', sub: 'AI bot is watching the market', t: 2e12 })
+    if ((bot.enabled || session) && !positions.some((p) => p.source === 'bot'))
+      items.push({ key: 'wait', tone: 'flat', glyph: 'dots', title: 'Waiting for a good entry', sub: 'The AI is watching the market', t: 2e12 })
     return items.sort((a, b) => b.t - a.t)
-  }, [positions, history, bot.enabled, Math.round(price * 10)])
+  }, [positions, history, bot.enabled, session, Math.round(price * 10)])
 }
 
-export function ActivityRows({ limit = 50 }: { limit?: number }) {
+export function ActivityRows({ limit = 50, compact = false }: { limit?: number; compact?: boolean }) {
   const items = useActivity().slice(0, limit)
   if (!items.length)
     return (
-      <div className="row" style={{ borderTop: 0 }}>
+      <div className={`empty-teach ${compact ? 'compact' : ''}`}>
         <div className="ri flat">
-          <Icon name="dots" size={16} />
+          <Icon name="spark" size={16} />
         </div>
         <div>
-          <div className="rt">No activity yet</div>
-          <div className="rs">Press “Start AI” and the AI will trade for you</div>
+          <div className="rt">No trades yet</div>
+          <div className="rs">Start a 1-minute AI session on the Home screen — your trades will appear here.</div>
         </div>
       </div>
     )
   return (
     <div className="rows">
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} mode="popLayout">
         {items.map((a) => (
-          <motion.div key={a.key} className="row" layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: EASE }}>
+          <motion.div
+            key={a.key}
+            className="row"
+            layout
+            initial={{ opacity: 0, x: -12, backgroundColor: 'rgba(124,92,255,0.16)' }}
+            animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(124,92,255,0)' }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: DUR.story, ease: EASE.emphasized }}
+          >
             <div className={`ri ${a.tone}`}>
               <Icon name={a.glyph} size={16} />
             </div>
@@ -356,8 +546,8 @@ export function ActivityRows({ limit = 50 }: { limit?: number }) {
               <div className="rs">{a.sub}</div>
             </div>
             {a.amount != null && (
-              <div className="ra" style={{ color: a.amount >= 0 ? 'var(--long)' : 'var(--short)' }}>
-                {a.amount >= 0 ? '+' : '−'}${Math.abs(a.amount).toFixed(2)}
+              <div className={`ra ${tone(a.amount)}`}>
+                {money(a.amount, { sign: true })}
                 <div>
                   <Sol usd={a.amount} signed />
                 </div>
@@ -370,253 +560,186 @@ export function ActivityRows({ limit = 50 }: { limit?: number }) {
   )
 }
 
-/* ───────────── AI signal hero ───────────── */
-
-export function SignalHero({ delay = 0 }: { delay?: number }) {
-  const signal = useSignal((s) => s.signal)
-  const interval = useMarket((s) => s.interval)
-  const bot = useBot()
-  const mode = useUI((s) => s.mode)
-  const guard = useGuard()
-  const dir = signal?.direction ?? 'NEUTRAL'
-  const segs = signal ? Math.max(1, Math.round(signal.confidence / 20)) : 0
-  const session = useSession()
-  const running = (!!session.active || bot.enabled) && mode === 'demo'
-  const setSheet = useUI((s) => s.setSheet)
-
-  return (
-    <Card className={`sig-card ${dir}`} delay={delay}>
-      <div>
-        <span className="pill-live">
-          <span className="live-dot" style={{ background: '#fff' }} /> AI signal · live
-        </span>
-      </div>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={signal ? action(signal) : 'load'}
-          className="big-num sig-title"
-          initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -14, filter: 'blur(8px)' }}
-          transition={{ duration: 0.5, ease: EASE }}
-        >
-          {signal ? action(signal) : 'Analyzing…'}
-        </motion.div>
-      </AnimatePresence>
-      <p className="sig-text">{signal ? headline(signal, interval) : 'The AI is reading the market — this takes a few seconds.'}</p>
-      <div className="meter">
-        {Array.from({ length: 5 }, (_, i) => (
-          <i key={i} className={i < segs ? 'on' : ''} />
-        ))}
-      </div>
-      <div style={{ fontSize: 12.5, marginTop: 8, color: 'rgba(255,255,255,0.8)' }}>
-        {signal ? `Confidence ${signal.confidence}% · ${confidenceWord(signal.confidence)}` : '—'}
-      </div>
-      {signal && !(session.active && mode === 'demo') && (
-        <div className="sig-stats">
-          <div>
-            <span>Expected in {horizon(interval)}</span>
-            <b>${fmtPrice(signal.forecast.at(-1)!.value)}</b>
-          </div>
-          <div>
-            <span>Models agree</span>
-            <b>{signal.factors.filter((f) => Math.sign(f.value) === Math.sign(signal.score)).length} / 9</b>
-          </div>
-          <div>
-            <span>Market mood</span>
-            <b>{mood(signal.score).word}</b>
-          </div>
-        </div>
-      )}
-      {session.active && mode === 'demo' ? (
-        <SessionLive />
-      ) : (
-      <div className="sig-actions">
-        <button className={`btn-white ${running ? 'stop' : ''}`} onClick={() => (running ? bot.toggle() : guard(() => setSheet('session')))}>
-          {running ? (
-            <>
-              <i className="g-stop" style={{ width: 11, height: 11 }} /> Stop AI trading
-            </>
-          ) : (
-            'Start AI trading'
-          )}
-        </button>
-        {running && (
-          <span className="ai-running">
-            <span className="live-dot" style={{ background: '#fff' }} /> AI is trading for you
-          </span>
-        )}
-      </div>
-      )}
-    </Card>
-  )
-}
-
 /* ───────────── price card ───────────── */
 
-const TF: { label: string; iv: Interval; bars: number }[] = [
-  { label: '1H', iv: '1m', bars: 60 },
-  { label: '1D', iv: '15m', bars: 96 },
-  { label: '1W', iv: '1h', bars: 168 },
-  { label: '1M', iv: '4h', bars: 180 },
+const TF: { label: string; iv: Interval; bars: number; word: string }[] = [
+  { label: '1H', iv: '1m', bars: 60, word: 'past hour' },
+  { label: '1D', iv: '15m', bars: 96, word: 'past day' },
+  { label: '1W', iv: '1h', bars: 168, word: 'past week' },
+  { label: '1M', iv: '4h', bars: 180, word: 'past month' },
 ]
 
-export function PriceCard({ delay = 0, height = 280 }: { delay?: number; height?: number }) {
-  const { candles, price, ticker, interval, setInterval } = useMarket()
+export function PriceCard({ delay = 0, height = 260 }: { delay?: number; height?: number }) {
+  const { price, ticker } = useMarket()
   const signal = useSignal((s) => s.signal)
-  const tf = TF.find((t) => t.iv === interval)
-  const bars = tf?.bars ?? 120
-  const points = useMemo(() => candles.slice(-bars).map((c) => ({ t: c.time, v: c.close })), [candles.length, candles[0]?.time, Math.round(price * 100), bars])
+  const [tf, setTf] = useState(TF[1])
+  const { candles, loading } = useCandles(tf.iv, tf.bars)
+  const points = useMemo(() => candles.map((c) => ({ t: c.time, v: c.close })), [candles])
   const fc = useMemo(
     () => signal?.forecast.filter((_, i) => i % 2 === 0 || i === signal.forecast.length - 1).map((f) => ({ t: f.time, v: f.value, lo: f.lower, hi: f.upper })),
     [signal?.forecast.at(-1)?.value.toFixed(2), signal?.forecast.length],
   )
-  const ch = ticker?.changePct ?? 0
+  const first = points[0]?.v
+  const ch = first ? ((price - first) / first) * 100 : (ticker?.changePct ?? 0)
   return (
     <Card delay={delay}>
-      <div className="lab">Solana price</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-        <span className="big-num" style={{ fontSize: 32 }}>
-          {price ? <AnimatedNumber value={price} format={(v) => `$${fmtPrice(v)}`} duration={0.4} /> : '—'}
-        </span>
-        <span style={{ color: ch >= 0 ? 'var(--long)' : 'var(--short)', fontWeight: 600 }}>
-          {fmtSigned(ch)}% <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>24h</span>
-        </span>
+      <div className="price-h">
+        <div>
+          <div className="lab">Solana · SOL</div>
+          <div className="big-num" style={{ fontSize: 34, marginTop: 6 }}>
+            {price ? <Ticker value={price} format={(v) => money(v)} /> : '—'}
+          </div>
+          <span className={tone(ch)} style={{ fontWeight: 600, fontSize: 13.5 }}>
+            {pct(ch)} <span className="muted-inline">{tf.word}</span>
+          </span>
+        </div>
+        <div className="tf" role="tablist" aria-label="Chart period">
+          {TF.map((t) => (
+            <button key={t.label} role="tab" aria-selected={tf.label === t.label} className={tf.label === t.label ? 'on' : ''} onClick={() => setTf(t)}>
+              {tf.label === t.label && <motion.span layoutId="tf-pill" className="pill" transition={SPRING} />}
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ marginTop: 14 }}>
-        {points.length > 2 ? <PriceLine points={points} forecast={fc} height={height} /> : <div className="skeleton" style={{ height }} />}
-      </div>
-      <div className="tf">
-        {TF.map((t) => (
-          <button key={t.label} className={interval === t.iv ? 'on' : ''} onClick={() => setInterval(t.iv)}>
-            {t.label}
-          </button>
-        ))}
+      <div style={{ marginTop: 18, position: 'relative', height }}>
+        <AnimatePresence mode="wait" initial={false}>
+          {points.length > 2 && !loading ? (
+            <motion.div key={'c' + tf.label} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: DUR.ui }}>
+              <PriceLine points={points} forecast={fc} height={height} axis dataKey={tf.label} />
+            </motion.div>
+          ) : (
+            <motion.div key="s" className="skeleton" style={{ height }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+          )}
+        </AnimatePresence>
       </div>
       <div className="px-stats">
         <div>
           <span>24h high</span>
-          <b>${fmtPrice(ticker?.high24h)}</b>
+          <b>{money(ticker?.high24h)}</b>
         </div>
         <div>
           <span>24h low</span>
-          <b>${fmtPrice(ticker?.low24h)}</b>
+          <b>{money(ticker?.low24h)}</b>
         </div>
         <div>
           <span>24h volume</span>
-          <b>${ticker ? (ticker.quoteVolume24h / 1e6).toFixed(1) + 'M' : '—'}</b>
+          <b>{ticker ? `$${(ticker.quoteVolume24h / 1e6).toFixed(1)}M` : '—'}</b>
         </div>
       </div>
     </Card>
   )
 }
 
-/* ───────────── insight strip ───────────── */
+/* ───────────── why card ───────────── */
 
-export function InsightStrip({ delay = 0 }: { delay?: number }) {
+export function WhyCard({ delay = 0 }: { delay?: number }) {
   const signal = useSignal((s) => s.signal)
-  if (!signal)
-    return (
-      <Card delay={delay}>
-        <div className="skeleton" style={{ height: 90 }} />
-      </Card>
-    )
-  const m = mood(signal.score)
-  const plan = signal.plan
-  const reasons = [...signal.factors].sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight)).slice(0, 3)
+  const setTab = useUI((s) => s.setTab)
+  const reasons = signal ? [...signal.factors].sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight)).slice(0, 5) : []
+  const m = signal ? mood(signal.score) : null
   return (
-    <Card delay={delay}>
-      <div className="insight">
-        <div>
-          <div className="lab">{plan ? 'Target price' : 'Expected price'}</div>
-          <div className="v">${fmtPrice(plan ? plan.take : signal.forecast.at(-1)!.value)}</div>
+    <Card
+      delay={delay}
+      title="Why the AI thinks so"
+      right={
+        <button className="link" onClick={() => setTab('how')}>
+          How it works
+        </button>
+      }
+    >
+      {m && (
+        <div className="mood">
+          <span>
+            Market mood <Hint>{TERMS.mood}</Hint>
+          </span>
+          <b className={m.tone}>{m.word}</b>
         </div>
-        <div>
-          <div className="lab">Safety stop</div>
-          <div className="v" style={plan ? undefined : { color: 'var(--ink-3)' }}>
-            {plan ? `$${fmtPrice(plan.stop)}` : 'No trade'}
+      )}
+      {!signal && <div className="skeleton" style={{ height: 180 }} />}
+      {reasons.map((f) => {
+        const v = Math.max(-1, Math.min(1, f.value))
+        const t = tone(Math.abs(v) < 0.12 ? 0 : v)
+        return (
+          <div key={f.key} className="reason">
+            <span className={`dot ${t}`} />
+            <span className="rtxt">{plainFactor(f)}</span>
+            <div className="bar">
+              <motion.i animate={{ width: `${Math.max(6, Math.abs(v) * 100)}%` }} transition={{ duration: DUR.story, ease: EASE.emphasized }} className={t} />
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="lab">Market mood</div>
-          <div className="v" style={{ color: m.tone === 'up' ? 'var(--long)' : m.tone === 'down' ? 'var(--short)' : 'var(--ink)' }}>
-            {m.word}
-          </div>
-        </div>
-        <div className="why">
-          <div className="lab" style={{ marginBottom: 6 }}>
-            Why the AI thinks so
-          </div>
-          {reasons.map((f) => {
-            const v = Math.max(-1, Math.min(1, f.value))
-            return (
-              <div key={f.key} className="reason">
-                <span>{plainFactor(f)}</span>
-                <div className="bar">
-                  <motion.i
-                    animate={{ width: `${Math.max(8, Math.abs(v) * 100)}%` }}
-                    transition={{ duration: 0.9, ease: EASE }}
-                    style={{ background: v >= 0 ? 'linear-gradient(90deg,rgba(20,241,149,.3),#14f195)' : 'linear-gradient(90deg,rgba(255,95,135,.3),#ff5f87)' }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+        )
+      })}
     </Card>
   )
 }
 
 /* ───────────── open positions ───────────── */
 
-export function PositionsCard({ delay = 0 }: { delay?: number }) {
+export function PositionsCard() {
   const price = useMarket((s) => s.price)
   const { positions, closePosition } = useTrading()
-  if (!positions.length) return null
   return (
-    <Card delay={delay} title="Open positions" right={<span className="lab">{positions.length} active</span>}>
-      <AnimatePresence initial={false}>
-        {positions.map((p) => {
-          const pnl = upnl(p, price)
-          return (
-            <motion.div key={p.id} className="pos" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
-              <div className={`ri ${p.side === 'long' ? 'up' : 'down'}`} style={{ width: 44, height: 44, borderRadius: 15, display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-                <Icon name={p.side === 'long' ? 'up' : 'down'} size={16} />
-              </div>
-              <div>
-                <div className="rt" style={{ fontWeight: 600 }}>
-                  {p.side === 'long' ? 'Bought' : 'Sold'} {p.size.toFixed(2)} SOL{p.leverage > 1 ? ` · ${p.leverage}x boost` : ''}
-                </div>
-                <div className="rs" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  at ${fmtPrice(p.entry)} · {p.source === 'bot' ? 'AI bot' : p.source === 'copilot' ? 'AI copilot' : 'manual'}
-                  {p.sl ? ` · stop $${fmtPrice(p.sl)}` : ''}
-                  {p.tp ? ` · target $${fmtPrice(p.tp)}` : ''}
-                </div>
-              </div>
-              <div className="ra" style={{ color: pnl >= 0 ? 'var(--long)' : 'var(--short)' }}>
-                {pnl >= 0 ? '+' : '−'}${Math.abs(pnl).toFixed(2)}
-                <div>
-                  <Sol usd={pnl} signed />
-                </div>
-              </div>
-              <button className="btn-dark" style={{ padding: '10px 16px', fontSize: 13 }} onClick={() => closePosition(p.id, price)}>
-                Close
-              </button>
-            </motion.div>
-          )
-        })}
-      </AnimatePresence>
-    </Card>
+    <AnimatePresence initial={false}>
+      {positions.length > 0 && (
+        <motion.div
+          key="pos"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: DUR.panel, ease: EASE.standard }}
+          style={{ overflow: 'hidden' }}
+        >
+          <section className="card">
+            <div className="card-h">
+              <div className="card-t">Open positions</div>
+              <span className="lab">{positions.length} active</span>
+            </div>
+            <AnimatePresence initial={false}>
+              {positions.map((p) => {
+                const pnl = upnl(p, price)
+                return (
+                  <motion.div key={p.id} className="pos" layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
+                    <div className={`ri ${p.side === 'long' ? 'up' : 'down'}`}>
+                      <Icon name={p.side === 'long' ? 'up' : 'down'} size={16} />
+                    </div>
+                    <div>
+                      <div className="rt">
+                        {p.side === 'long' ? 'Buy' : 'Sell'} · {money(p.margin, { d: 0 })}
+                        {p.leverage > 1 ? ` · ${p.leverage}x boost` : ''}
+                      </div>
+                      <div className="rs">
+                        Entry {money(p.entry)}
+                        {p.sl ? ` · stop ${money(p.sl)}` : ''}
+                        {p.tp ? ` · target ${money(p.tp)}` : ''} · {p.source === 'bot' ? 'AI' : p.source === 'copilot' ? 'AI copilot' : 'You'}
+                      </div>
+                    </div>
+                    <div className={`ra ${tone(pnl)}`}>
+                      {money(pnl, { sign: true })}
+                      <div>
+                        <Sol usd={pnl} signed />
+                      </div>
+                    </div>
+                    <button className="btn-dark sm" onClick={() => closePosition(p.id, price)}>
+                      Close
+                    </button>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+          </section>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
 /* ───────────── sheets ───────────── */
 
 const RISK = {
-  low: { label: 'Careful', desc: 'Small positions, 1% of balance at risk per trade', riskPct: 1, leverage: 2 },
-  mid: { label: 'Balanced', desc: '1.5% at risk per trade — the default', riskPct: 1.5, leverage: 3 },
-  high: { label: 'Bold', desc: '3% at risk per trade, larger moves both ways', riskPct: 3, leverage: 5 },
+  low: { label: 'Careful', desc: 'Small positions · 1% of balance at risk per trade', riskPct: 1, leverage: 2 },
+  mid: { label: 'Balanced', desc: '1.5% at risk per trade — recommended to start', riskPct: 1.5, leverage: 3 },
+  high: { label: 'Bold', desc: '3% at risk per trade · bigger swings both ways', riskPct: 3, leverage: 5 },
 }
 
 export function Sheets() {
@@ -631,18 +754,88 @@ export function Sheets() {
       {sheet && (
         <motion.div className="overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSheet(null)}>
           <motion.div
-            className="sheet"
+            className={`sheet ${sheet === 'help' ? 'wide' : ''}`}
+            role="dialog"
+            aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, y: 40, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.97 }}
-            transition={{ duration: 0.45, ease: EASE }}
+            initial={{ opacity: 0, y: 30, scale: 0.97, filter: 'blur(8px)' }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: 20, scale: 0.98, filter: 'blur(6px)' }}
+            transition={{ duration: DUR.panel, ease: EASE.emphasized }}
           >
-            {sheet === 'settings' ? <SettingsSheet /> : sheet === 'session' ? <SessionSheet /> : <TradeSheet side={sheet === 'buy' ? 'long' : 'short'} />}
+            {sheet === 'settings' ? <SettingsSheet /> : sheet === 'help' ? <HelpSheet /> : sheet === 'session' ? <SessionPicker /> : <TradeSheet side={sheet === 'buy' ? 'long' : 'short'} />}
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+function SheetHead({ title, sub }: { title: string; sub?: string }) {
+  const setSheet = useUI((s) => s.setSheet)
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3>{title}</h3>
+        <button className="btn-dark sm" onClick={() => setSheet(null)}>
+          Close
+        </button>
+      </div>
+      {sub && (
+        <p className="lab" style={{ marginTop: 6, fontSize: 14 }}>
+          {sub}
+        </p>
+      )}
+    </>
+  )
+}
+
+function SessionPicker() {
+  const setSheet = useUI((s) => s.setSheet)
+  const start = useSession((s) => s.start)
+  const bot = useBot()
+  const eq = useEquity()
+  const guard = useGuard()
+  const [m, setM] = useState(1)
+  const plan = sessionPlan(m, eq, bot.riskPct)
+  return (
+    <>
+      <SheetHead title="Start AI session" sub="Choose how long the AI should trade for you. You’ll get a full report at the end." />
+      <div className="dur-row big" style={{ marginTop: 20 }}>
+        {DURATIONS.map((d) => (
+          <button key={d} className={m === d ? 'on' : ''} onClick={() => setM(d)}>
+            {m === d && <motion.span layoutId="dur-pill2" className="pill" transition={SPRING} />}
+            <span>{d} min</span>
+          </button>
+        ))}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div className="kv2">
+          <span>Uses up to</span>
+          <span>{money(plan.uses, { d: 0 })}</span>
+        </div>
+        <div className="kv2">
+          <span>Max loss</span>
+          <span>{money(plan.maxLoss, { d: 0 })}</span>
+        </div>
+        <div className="kv2">
+          <span>Estimated fees</span>
+          <span>~{money(plan.fees)}</span>
+        </div>
+      </div>
+      <button
+        className="btn-violet"
+        style={{ width: '100%', marginTop: 20 }}
+        onClick={() =>
+          guard(() => {
+            start(m)
+            setSheet(null)
+          })
+        }
+      >
+        Start {m}-minute session
+      </button>
+    </>
   )
 }
 
@@ -657,30 +850,24 @@ function TradeSheet({ side }: { side: Side }) {
   const a = Math.max(0, +amt || 0)
   const A = signal?.atr ?? price * 0.006
   const d = side === 'long' ? 1 : -1
-  const sl = price - d * A * 1.6
-  const tp = price + d * A * 2.8
+  const sDist = Math.max(A * 1.6, price * 0.006)
+  const sl = price - d * sDist
+  const tp = price + d * sDist * 1.75
   const size = price ? (a * boost) / price : 0
   const buy = side === 'long'
   const agrees = signal && ((buy && signal.direction === 'LONG') || (!buy && signal.direction === 'SHORT'))
   const ok = a >= 1 && a <= balance
+  const lossAtStop = (sDist / price) * a * boost
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>{buy ? 'Buy SOL' : 'Sell SOL'}</h3>
-        <button className="btn-dark" style={{ padding: '8px 14px', fontSize: 12 }} onClick={() => setSheet(null)}>
-          Close
-        </button>
-      </div>
-      <p className="lab" style={{ marginTop: 6 }}>
-        {buy ? 'You profit if the SOL price goes up.' : 'You profit if the SOL price goes down.'}
-      </p>
+      <SheetHead title={buy ? 'Buy SOL' : 'Sell SOL'} sub={buy ? 'You profit if the SOL price goes up.' : 'You profit if the SOL price goes down — no SOL needed.'} />
       <div className="amount">
         <span>$</span>
-        <input value={amt} style={{ width: `${Math.max(1, amt.length) * 0.78}em` }} inputMode="decimal" onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} autoFocus />
+        <input value={amt} style={{ width: `${Math.max(1, amt.length) * 0.62}em` }} inputMode="decimal" aria-label="Amount in dollars" onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} autoFocus />
       </div>
       <div className="lab" style={{ textAlign: 'center' }}>
-        ≈ {size.toFixed(3)} SOL{boost > 1 ? ` with ${boost}x boost` : ''} · available {fmtUsd(balance)} <Sol usd={balance} />
+        ≈ {size.toFixed(3)} SOL · available {money(balance)}
       </div>
       <div className="quick">
         {[100, 250, 500, 1000].map((v) => (
@@ -691,7 +878,7 @@ function TradeSheet({ side }: { side: Side }) {
       </div>
       <div style={{ marginTop: 20 }}>
         <div className="lab" style={{ marginBottom: 8 }}>
-          Boost (leverage)
+          Boost <Hint>{TERMS.boost}</Hint>
         </div>
         <div className="quick" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginTop: 0 }}>
           {[1, 2, 5].map((b) => (
@@ -702,36 +889,42 @@ function TradeSheet({ side }: { side: Side }) {
         </div>
       </div>
       <div style={{ marginTop: 20 }}>
-        <div className="kv2" style={{ cursor: 'pointer' }} onClick={() => setProtect((p) => !p)}>
-          <span>AI protection (auto stop & target)</span>
-          <span style={{ color: protect ? 'var(--long)' : 'var(--ink-3)' }}>{protect ? 'On' : 'Off'}</span>
+        <div className="kv2 toggle-row" role="switch" aria-checked={protect} tabIndex={0} onClick={() => setProtect((p) => !p)} onKeyDown={(e) => e.key === 'Enter' && setProtect((p) => !p)}>
+          <span>
+            AI protection <Hint>{TERMS.stop}</Hint>
+          </span>
+          <span className={`switch ${protect ? 'on' : ''}`}>
+            <i />
+          </span>
         </div>
         {protect && (
           <>
             <div className="kv2">
               <span>Safety stop</span>
-              <span>${fmtPrice(sl)}</span>
+              <span>
+                {money(sl)} <small className="dim">max loss {money(lossAtStop)}</small>
+              </span>
             </div>
             <div className="kv2">
               <span>Target</span>
-              <span>${fmtPrice(tp)}</span>
+              <span>{money(tp)}</span>
             </div>
           </>
         )}
         <div className="kv2">
           <span>AI opinion</span>
-          <span style={{ color: agrees ? 'var(--long)' : 'var(--amber)' }}>{signal ? (agrees ? 'Agrees' : signal.direction === 'NEUTRAL' ? 'Neutral' : 'Disagrees') : '—'}</span>
+          <span className={agrees ? 'up' : 'warn-t'}>{signal ? (agrees ? 'Agrees with this trade' : signal.direction === 'NEUTRAL' ? 'Would wait' : 'Disagrees') : '—'}</span>
         </div>
       </div>
       <button
-        className="btn-violet"
-        style={{ width: '100%', marginTop: 22, background: buy ? 'var(--long)' : 'var(--short)', color: buy ? '#062016' : '#2a0612', boxShadow: 'none' }}
+        className={`btn-violet ${buy ? 'btn-go-long' : 'btn-go-short'}`}
+        style={{ width: '100%', marginTop: 22 }}
         disabled={!ok}
         onClick={() => {
           if (openMarket({ side, margin: a, leverage: boost, sl: protect ? sl : null, tp: protect ? tp : null }, price)) setSheet(null)
         }}
       >
-        {buy ? `Buy $${a || 0} of SOL` : `Sell $${a || 0} of SOL`}
+        {buy ? `Buy ${money(a, { d: 0 })} of SOL` : `Sell ${money(a, { d: 0 })} of SOL`}
       </button>
     </>
   )
@@ -744,59 +937,105 @@ function SettingsSheet() {
   const level = bot.riskPct <= 1 ? 'low' : bot.riskPct >= 3 ? 'high' : 'mid'
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>AI settings</h3>
-        <button className="btn-dark" style={{ padding: '8px 14px', fontSize: 12 }} onClick={() => setSheet(null)}>
-          Done
-        </button>
-      </div>
-      <div className="lab" style={{ margin: '20px 0 10px' }}>
-        Risk level
+      <SheetHead title="AI settings" />
+      <div className="sub-h" style={{ marginTop: 20 }}>
+        <span>Risk level</span>
       </div>
       {(Object.keys(RISK) as (keyof typeof RISK)[]).map((k) => (
         <button key={k} className={`opt ${level === k ? 'on' : ''}`} onClick={() => bot.set({ riskPct: RISK[k].riskPct, leverage: RISK[k].leverage })}>
           <div>
-            <div style={{ fontWeight: 600 }}>{RISK[k].label}</div>
-            <div className="lab" style={{ fontSize: 12 }}>
-              {RISK[k].desc}
-            </div>
+            <div className="ot">{RISK[k].label}</div>
+            <div className="od">{RISK[k].desc}</div>
           </div>
           <span className="radio" />
         </button>
       ))}
-      <div className="lab" style={{ margin: '20px 0 10px' }}>
-        AI strategy
+      <div className="sub-h" style={{ marginTop: 20 }}>
+        <span>AI strategy</span>
       </div>
       {(Object.keys(STRATEGIES) as StrategyId[]).map((id) => (
         <button key={id} className={`opt ${bot.strategy === id ? 'on' : ''}`} onClick={() => bot.set({ strategy: id })}>
           <div>
-            <div style={{ fontWeight: 600 }}>{STRATEGIES[id].name}</div>
-            <div className="lab" style={{ fontSize: 12 }}>
-              {STRATEGIES[id].desc}
-            </div>
+            <div className="ot">{STRATEGIES[id].name}</div>
+            <div className="od">{STRATEGIES[id].desc}</div>
           </div>
           <span className="radio" />
         </button>
       ))}
-      <button
-        className="btn-dark"
-        style={{ width: '100%', marginTop: 20 }}
-        onClick={() => {
-          setSheet(null)
-          setTimeout(() => useUI.getState().setTutorialOpen(true), 300)
-        }}
-      >
-        Show tutorial again
-      </button>
-      <button
-        className="btn-dark"
-        style={{ width: '100%', marginTop: 8 }}
-        onClick={() => {
-          if (confirm('Reset the demo balance to $10,000?')) reset()
-        }}
-      >
-        Reset demo balance
-      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 20 }}>
+        <button
+          className="btn-dark"
+          onClick={() => {
+            setSheet(null)
+            setTimeout(() => useUI.getState().setTutorialOpen(true), 300)
+          }}
+        >
+          Show tutorial
+        </button>
+        <button
+          className="btn-dark"
+          onClick={() => {
+            if (confirm('Reset the demo balance to $10,000?')) reset()
+          }}
+        >
+          Reset demo balance
+        </button>
+      </div>
+    </>
+  )
+}
+
+const GLOSSARY: [string, string][] = [
+  ['AI signal', 'What the AI suggests right now: Buy SOL, Sell SOL or Wait.'],
+  ['Confidence', TERMS.confidence],
+  ['Target', TERMS.target],
+  ['Safety stop', TERMS.stop],
+  ['Sell (short)', TERMS.sell],
+  ['Boost', TERMS.boost],
+  ['Session', TERMS.session],
+  ['Max loss', TERMS.maxLoss],
+  ['Fees', 'Exchanges charge about 0.05% per trade. The AI only trades when the expected move is bigger than fees.'],
+  ['Demo mode', 'Virtual money on live prices. Nothing you do here costs real money.'],
+]
+
+const FAQ: [string, string][] = [
+  ['Is the AI always right?', 'No. It is a probability model — it wins some trades and loses others. The safety stop limits every loss.'],
+  ['Where do prices come from?', 'Live data from Binance, Bybit or OKX. If they are blocked in your region, an offline simulator is used and the status bar says so.'],
+  ['Can I lose more than I put in?', `No. The AI only uses the amount shown before a session, and Real mode needs a wallet with at least $${MIN_REAL_USD}.`],
+  ['How do I stop the AI?', 'Press “End now” on the session panel at any time. Open positions are closed immediately.'],
+]
+
+function HelpSheet() {
+  const [open, setOpen] = useState<number | null>(0)
+  return (
+    <>
+      <SheetHead title="Help & glossary" sub="Every term on the site, in plain words." />
+      <dl className="gloss">
+        {GLOSSARY.map(([t, d]) => (
+          <div key={t}>
+            <dt>{t}</dt>
+            <dd>{d}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="sub-h" style={{ marginTop: 22 }}>
+        <span>Questions</span>
+      </div>
+      {FAQ.map(([q, a], i) => (
+        <div key={q} className={`faq ${open === i ? 'on' : ''}`}>
+          <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+            {q}
+            <Icon name="chevron" size={10} />
+          </button>
+          <AnimatePresence initial={false}>
+            {open === i && (
+              <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: DUR.ui, ease: EASE.standard }}>
+                {a}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
     </>
   )
 }

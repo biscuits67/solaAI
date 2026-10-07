@@ -28,6 +28,8 @@ export interface ForecastPoint {
 export interface Signal {
   score: number
   direction: Direction
+  expectedPct: number
+  waitReason: 'weak' | 'small-move' | null
   confidence: number
   factors: Factor[]
   forecast: ForecastPoint[]
@@ -43,6 +45,9 @@ export interface Signal {
   summary: string[]
   history: number[] // per-bar score (candle-only experts)
 }
+
+/** Round-trip taker fees (0.1%) + spread/slippage buffer. */
+export const MIN_EDGE_PCT = 0.25
 
 const tanh = Math.tanh
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
@@ -172,7 +177,7 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
   const wsum = factors.reduce((s, f) => s + f.weight, 0)
   const raw = factors.reduce((s, f) => s + f.value * f.weight, 0) / wsum
   const score = clamp(raw * 160, -100, 100)
-  const dir: Direction = score > 18 ? 'LONG' : score < -18 ? 'SHORT' : 'NEUTRAL'
+  let dir: Direction = score > 18 ? 'LONG' : score < -18 ? 'SHORT' : 'NEUTRAL'
   const sign = Math.sign(score) || 1
   const agree = factors.reduce((s, f) => s + (Math.sign(f.value) === sign ? f.weight * Math.abs(f.value) : 0), 0)
   const total = factors.reduce((s, f) => s + f.weight * Math.abs(f.value), 0) || 1
@@ -192,6 +197,13 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
     forecast.push({ time: lastT + t * step, value: mid, upper: mid * Math.exp(band), lower: mid * Math.exp(-band) })
   }
   const target = forecast.at(-1)!.value
+  const expectedPct = ((target - px) / px) * 100
+  // only trade when the expected move clearly beats fees + spread, and agrees with the score
+  let waitReason: Signal['waitReason'] = dir === 'NEUTRAL' ? 'weak' : null
+  if (dir !== 'NEUTRAL' && (Math.abs(expectedPct) < MIN_EDGE_PCT || Math.sign(expectedPct) !== Math.sign(score))) {
+    dir = 'NEUTRAL'
+    waitReason = 'small-move'
+  }
 
   const lv = levels(c.slice(-200))
   const trendStr = Math.abs(e.trend)
@@ -206,9 +218,12 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
 
   let plan: Signal['plan'] = null
   if (dir !== 'NEUTRAL') {
-    const stop = dir === 'LONG' ? px - A * 1.6 : px + A * 1.6
-    const take = dir === 'LONG' ? px + A * 2.8 : px - A * 2.8
-    plan = { entry: px, stop, take, rr: 2.8 / 1.6 }
+    // stops sized to volatility, never tighter than normal market noise
+    const sDist = Math.max(A * 1.6, px * 0.006)
+    const tDist = Math.max(A * 2.8, sDist * 1.75, Math.abs(target - px))
+    const stop = dir === 'LONG' ? px - sDist : px + sDist
+    const take = dir === 'LONG' ? px + tDist : px - tDist
+    plan = { entry: px, stop, take, rr: tDist / sDist }
   }
 
   const sorted = [...factors].sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight))
@@ -230,6 +245,8 @@ export function analyze(c: Candle[], book: OrderBook | null, trades: Trade[], ho
   return {
     score,
     direction: dir,
+    expectedPct,
+    waitReason,
     confidence,
     factors,
     forecast,

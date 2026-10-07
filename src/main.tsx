@@ -5,6 +5,7 @@ import '@fontsource-variable/geist-mono'
 import './styles/global.css'
 import './styles/app.css'
 import './styles/premium.css'
+import './styles/v6.css'
 import App from './App'
 
 // favicon rendered on a canvas (no image assets)

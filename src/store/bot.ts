@@ -4,6 +4,7 @@ import { buildCtx, scoreAt, strategySignal, STRATEGIES, type StrategyId } from '
 import { useMarket } from './market'
 import { useTrading } from './trading'
 import { useSession } from './session'
+import { useSignal } from './signal'
 import { think } from './thoughts'
 import { toast } from './ui'
 
@@ -28,7 +29,7 @@ interface BotState extends BotConfig {
   logs: BotLog[]
   lastBar: number
   set: (p: Partial<BotConfig>) => void
-  toggle: () => void
+  toggle: (silent?: boolean) => void
   log: (text: string, kind?: BotLog['kind']) => void
 }
 
@@ -46,11 +47,11 @@ export const useBot = create<BotState>()(
       logs: [],
       lastBar: 0,
       set: (p) => set(p),
-      toggle: () => {
+      toggle: (silent = false) => {
         const on = !get().enabled
         set({ enabled: on, startedAt: on ? Date.now() : null, lastBar: 0 })
         get().log(on ? `AI bot started · ${STRATEGIES[get().strategy].name}` : 'AI bot stopped', 'info')
-        toast(on ? 'AI bot started' : 'AI bot stopped', STRATEGIES[get().strategy].name, on ? 'long' : 'info')
+        if (!silent) toast(on ? 'AI bot started' : 'AI bot stopped', STRATEGIES[get().strategy].name, on ? 'long' : 'info')
       },
       log: (text, kind = 'think') => {
         set({ logs: [{ t: Date.now(), text, kind }, ...get().logs].slice(0, 120) })
@@ -80,7 +81,11 @@ export function botStep() {
   const mine = tr.positions.filter((p) => p.source === 'bot')
 
   let sig = 0
-  if (bot.strategy === 'ai') sig = score > bot.threshold ? 1 : score < -bot.threshold ? -1 : 0
+  if (bot.strategy === 'ai') {
+    // follow the published AI signal (it already filters out moves smaller than fees)
+    const d = useSignal.getState().signal?.direction
+    sig = d === 'LONG' && score > bot.threshold ? 1 : d === 'SHORT' && score < -bot.threshold ? -1 : 0
+  }
   else if (newBar) sig = strategySignal(x, closed, bot.strategy, bot.threshold)
 
   if (newBar) {

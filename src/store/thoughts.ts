@@ -51,10 +51,9 @@ function cycleSteps(sig: Signal): [Stage, string, Tone][] {
     const w = f.value > 0.12 ? 'UP' : f.value < -0.12 ? 'DOWN' : 'NEUTRAL'
     steps.push(['EXPERT', `${f.label} model votes ${w}: ${plainFactor(f).toLowerCase()}.`, toneOf(f.value)])
   }
-  const agree = sig.factors.filter((f) => Math.sign(f.value) === Math.sign(sig.score)).length
   steps.push([
     'ENSEMBLE',
-    `Combined score ${sig.score > 0 ? '+' : ''}${sig.score.toFixed(0)} on a −100…+100 scale. ${agree} of 9 models agree, confidence ${sig.confidence}%.`,
+    `Combined score ${sig.score > 0 ? '+' : ''}${sig.score.toFixed(0)} on a −100…+100 scale · confidence ${sig.confidence}%.`,
     toneOf(sig.score / 100),
   ])
   const last = sig.forecast.at(-1)!
@@ -64,14 +63,16 @@ function cycleSteps(sig: Signal): [Stage, string, Tone][] {
     `Expected price in ${horizon(m.interval)}: $${fmtPrice(last.value)} (${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%). Likely range $${fmtPrice(last.lower)} – $${fmtPrice(last.upper)}.`,
     ch > 0.1 ? 'bull' : ch < -0.1 ? 'bear' : 'neutral',
   ])
-  const th = bot.threshold
+  void bot
   const decision =
-    sig.score > th
-      ? `Signal is strong → BUY.${sig.plan ? ` Safety stop $${fmtPrice(sig.plan.stop)}, target $${fmtPrice(sig.plan.take)}.` : ''}`
-      : sig.score < -th
-        ? `Signal is strong → SELL.${sig.plan ? ` Safety stop $${fmtPrice(sig.plan.stop)}, target $${fmtPrice(sig.plan.take)}.` : ''}`
-        : `Signal too weak (${Math.abs(sig.score).toFixed(0)} of ${th} needed) → WAIT for a better moment.`
-  steps.push(['DECISION', decision, sig.score > th ? 'bull' : sig.score < -th ? 'bear' : 'neutral'])
+    sig.direction === 'LONG'
+      ? `Decision: BUY.${sig.plan ? ` Safety stop $${fmtPrice(sig.plan.stop)}, target $${fmtPrice(sig.plan.take)}.` : ''}`
+      : sig.direction === 'SHORT'
+        ? `Decision: SELL.${sig.plan ? ` Safety stop $${fmtPrice(sig.plan.stop)}, target $${fmtPrice(sig.plan.take)}.` : ''}`
+        : sig.waitReason === 'small-move'
+          ? `Decision: WAIT — the expected move is smaller than fees.`
+          : `Decision: WAIT — the signal is not strong enough yet.`
+  steps.push(['DECISION', decision, sig.direction === 'LONG' ? 'bull' : sig.direction === 'SHORT' ? 'bear' : 'neutral'])
   return steps
 }
 
