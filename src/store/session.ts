@@ -7,8 +7,9 @@ import { toast, toastMute } from './ui'
 
 /**
  * Timed AI trading sessions (1 / 5 / 10 min).
- * NOTE (demo only, temporary): the 1-minute session is scripted to show a
- * fast, large profit. 5/10-minute sessions use the real AI bot logic.
+ * Demo sessions are simulated: a series of trades spread over the session,
+ * each one a win or a loss, so a session can end in profit or in loss. Longer
+ * sessions trade more, so their results move further in either direction.
  */
 
 export interface SessionResult {
@@ -67,19 +68,9 @@ export const useSession = create<S>((set, get) => ({
     if (get().active) return
     const now = Date.now()
     const startEquity = eq()
-    const scripted = minutes === 1
+    const scripted = true
     const bot = useBot.getState()
-    const plan: Planned[] = []
-    if (scripted) {
-      // demo: 5 quick winning trades worth ~12–18% of equity in total
-      const target = startEquity * (0.12 + Math.random() * 0.06)
-      const w = Array.from({ length: 5 }, () => 0.6 + Math.random())
-      const ws = w.reduce((a, b) => a + b, 0)
-      for (let i = 0; i < 5; i++) {
-        const openAt = now + 3000 + i * 10500
-        plan.push({ openAt, closeAt: openAt + 6500 + Math.random() * 1500, side: Math.random() > 0.35 ? 'long' : 'short', profit: (target * w[i]) / ws })
-      }
-    }
+    const plan = buildPlan(minutes, now, startEquity, sessionPlan(minutes, startEquity, bot.riskPct).maxLoss)
     set({
       active: {
         minutes,
@@ -94,7 +85,6 @@ export const useSession = create<S>((set, get) => ({
       },
       result: null,
     })
-    if (!scripted) bot.set({ threshold: Math.min(bot.threshold, 20) })
     toastMute.bot = true
     if (!bot.enabled) bot.toggle(true)
     toast(`${minutes}-minute AI session started`, 'You can end it at any time', 'long')
@@ -151,8 +141,12 @@ function closeScripted(pl: Planned, id: string) {
   const dir = p.side === 'long' ? 1 : -1
   const fees = p.size * p.entry * 0.0005 * 2
   const exit = p.entry + (dir * (pl.profit + fees)) / p.size
-  useTrading.getState().closePosition(p.id, exit, 'Take profit')
-  useBot.getState().log(`Closed ${p.side === 'long' ? 'buy' : 'sell'} at $${exit.toFixed(2)} → +$${pl.profit.toFixed(2)}`, 'close')
+  const win = pl.profit >= 0
+  useTrading.getState().closePosition(p.id, exit, win ? 'Take profit' : 'Stop loss')
+  useBot.getState().log(
+    `Closed ${p.side === 'long' ? 'buy' : 'sell'} at $${exit.toFixed(2)} → ${win ? '+' : '−'}$${Math.abs(pl.profit).toFixed(2)}${win ? '' : ' (stop hit)'}`,
+    'close',
+  )
 }
 
 /** Called ~every 500 ms from the app shell. */
@@ -203,11 +197,39 @@ export function sessionPnl(s: Active) {
 
 /** What a session may use and lose — shown before the user starts it. */
 export function sessionPlan(minutes: number, equity: number, riskPct: number) {
-  const scripted = minutes === 1
-  const usesPct = scripted ? 30 : 50
+  const usesPct = 30
   const uses = (equity * usesPct) / 100
-  const trades = scripted ? 5 : minutes === 5 ? 3 : 4
+  const trades = TRADES[minutes] ?? Math.max(2, Math.round(minutes * 1.2))
   const maxLoss = equity * Math.min(0.15, (riskPct * 2) / 100)
   const fees = uses * 2 * 0.001 * trades
   return { usesPct, uses, maxLoss, fees, trades }
+}
+
+/** Typical number of trades per session length. */
+const TRADES: Record<number, number> = { 1: 3, 5: 7, 10: 12 }
+
+const rnd = (a: number, b: number) => a + Math.random() * (b - a)
+
+/**
+ * Plan the simulated trades of a session. Each trade wins ~55% of the time;
+ * wins and losses are a fraction of a percent of equity each, and the running
+ * loss never goes past the session's max-loss limit.
+ */
+function buildPlan(minutes: number, now: number, equity: number, maxLoss: number): Planned[] {
+  const base = TRADES[minutes] ?? Math.max(2, Math.round(minutes * 1.2))
+  const n = Math.max(2, base + Math.round(rnd(-1, 1)))
+  const span = minutes * 60_000 - 6000
+  const slot = span / n
+  const plan: Planned[] = []
+  let total = 0
+  for (let i = 0; i < n; i++) {
+    const openAt = now + 3000 + i * slot + rnd(0, slot * 0.15)
+    const hold = slot * rnd(0.45, 0.75)
+    let profit = Math.random() < 0.55 ? equity * rnd(0.003, 0.012) : -equity * rnd(0.002, 0.009)
+    // keep the session inside its max-loss limit
+    if (total + profit < -maxLoss * 0.9) profit = Math.max(profit, -maxLoss * 0.9 - total)
+    total += profit
+    plan.push({ openAt, closeAt: openAt + hold, side: Math.random() > 0.45 ? 'long' : 'short', profit })
+  }
+  return plan
 }
