@@ -96,3 +96,18 @@ Decisions: 1-minute session keeps the "wow" result (+12–18%) for now; logo sta
 ### How AI decides
 - [ ] Neural network canvas is the hero but labels are small and low-contrast
 - [ ] Pro chart toggles use the old visual style
+
+## I. Motion & animation review
+- [ ] Too many infinite animations at once (pulsing dots in status bar / signal pill / cards, sheen, floating circles, grain, particles, ripples) — they compete; allow max one "live" pulse per screen
+- [ ] Staggered blur entrance on every tab switch feels slow — first load only; tab switch = 150–200 ms crossfade
+- [ ] `filter: blur()` in enter/exit animations (modals, toasts, titles) is GPU-heavy and janky on laptops — use opacity + transform only
+- [ ] Price rolls/counts every tick → constant visual noise; prices should tick with a brief colour flash, only balance/profit count up
+- [ ] Meaningful moments have no motion: signal change (Wait → Sell), trade opened/closed, balance updated after a trade — these deserve the animation budget
+- [ ] Charts animate only on first draw and then jump on new data — smooth morph between datasets / timeframe switches
+- [ ] One easing curve and random durations (0.35–1.6 s) everywhere — define a motion system:
+  - durations: 120 (micro) · 200 (UI) · 320 (panels) · 600 (story moments)
+  - easings: standard, emphasized, spring for physical elements (switches, sheets)
+- [ ] Hover/press states incomplete: cards only change border, rows have no hover, no pressed state on cards
+- [ ] Skeleton → content swaps without a crossfade
+- [ ] `prefers-reduced-motion` is handled in CSS only — framer-motion ignores it; wrap the app in `MotionConfig reducedMotion="user"`
+- [ ] Confetti covers the profit number — confine it to the edges / behind content
