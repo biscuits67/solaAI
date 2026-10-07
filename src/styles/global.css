@@ -2697,3 +2697,26 @@ input[type='number'] {
 .modal.welcome {
   width: min(620px, 100%);
 }
+/* neutral cards: nothing pre-selected */
+.mode-card.demo {
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+}
+.mode-card.demo:hover {
+  border-color: rgba(47, 243, 179, 0.55);
+  background: linear-gradient(160deg, rgba(47, 243, 179, 0.12), rgba(255, 255, 255, 0.02) 70%);
+  box-shadow: 0 20px 50px -24px rgba(47, 243, 179, 0.6);
+}
+.mode-card.real:hover {
+  background: linear-gradient(160deg, rgba(157, 107, 255, 0.14), rgba(255, 255, 255, 0.02) 70%);
+}
+.demo-pill.choose {
+  color: var(--violet-2);
+  background: rgba(157, 107, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(157, 107, 255, 0.35);
+}
+.demo-pill.choose .live-dot {
+  background: var(--violet);
+  animation: vping 1.6s var(--ease) infinite;
+}

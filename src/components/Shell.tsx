@@ -235,21 +235,21 @@ export function WelcomeModal() {
                 <motion.div key="choose" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
                   <div className="welcome-head">
                     <div className="orb" style={{ width: 64, height: 64 }} />
-                    <div className="demo-pill">
-                      <span className="live-dot" /> DEMO MODE ACTIVE
+                    <div className="demo-pill choose">
+                      <span className="live-dot" /> SELECT A MODE
                     </div>
                   </div>
                   <h2 className="display welcome-title">
                     Welcome to <em>Solana AI</em>
                   </h2>
                   <p className="muted welcome-text">
-                    You are currently in <b style={{ color: 'var(--mint)' }}>Demo mode</b>. The AI trades a virtual $10,000 balance on live SOL market data — nothing is at risk. Choose how you want to continue:
+                    Choose how you want to use the AI. You can switch modes at any time from the top bar.
                   </p>
                   <div className="mode-cards">
-                    <motion.button className="mode-card demo on" onClick={stayDemo} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
+                    <motion.button className="mode-card demo" onClick={stayDemo} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
                       <div className="mc-top">
                         <span className="mc-glyph demo" />
-                        <span className="mc-badge">Recommended</span>
+                        <span className="mc-badge">No risk</span>
                       </div>
                       <h4>Demo</h4>
                       <ul>
@@ -257,7 +257,7 @@ export function WelcomeModal() {
                         <li>Live prices from top exchanges</li>
                         <li>Full AI bot, zero risk</li>
                       </ul>
-                      <span className="mc-cta">Continue in Demo →</span>
+                      <span className="mc-cta">Start in Demo →</span>
                     </motion.button>
                     <motion.button className="mode-card real" onClick={() => setStep('warn')} whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}>
                       <div className="mc-top">
