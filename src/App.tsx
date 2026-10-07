@@ -3,7 +3,7 @@ import { Component, useEffect, type ReactNode } from 'react'
 import { Background } from './components/Background'
 import { Footer, Header, MobileNav, Sheets, StatusBar } from './components/Fintech'
 import { SessionResult } from './components/Session'
-import { Toasts, WalletModal, WelcomeModal } from './components/Shell'
+import { Toasts, WelcomeModal } from './components/Shell'
 import { Tutorial } from './components/Tutorial'
 import { DUR, EASE, finishIntro, isIntro } from './lib/motion'
 import { botStep } from './store/bot'
@@ -85,7 +85,6 @@ export default function App() {
       <WelcomeModal />
       <Tutorial />
       <SessionResult />
-      <WalletModal />
       <Toasts />
     </MotionConfig>
   )

@@ -213,11 +213,9 @@ export function useEquity() {
 
 export function useGuard() {
   const mode = useUI((s) => s.mode)
-  const setWalletOpen = useUI((s) => s.setWalletOpen)
   return (fn: () => void) => {
     if (mode === 'real') {
       toast('Connect a wallet first', `The AI trades only with wallets holding at least $${MIN_REAL_USD}`, 'error')
-      setWalletOpen(true)
       return
     }
     fn()
@@ -389,7 +387,6 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
   const mode = useUI((s) => s.mode)
   const setSheet = useUI((s) => s.setSheet)
   const setTab = useUI((s) => s.setTab)
-  const setWalletOpen = useUI((s) => s.setWalletOpen)
   const eq = useEquity()
   const pnl = eq - START_BALANCE
   const guard = useGuard()
@@ -430,8 +427,8 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
           <div className="big-num bal" style={{ color: 'var(--ink-4)' }}>
             $—
           </div>
-          <button className="btn-violet" style={{ marginTop: 14 }} onClick={() => setWalletOpen(true)}>
-            Connect wallet
+          <button className="btn-violet" style={{ marginTop: 14 }}>
+            Connect
           </button>
         </>
       )}

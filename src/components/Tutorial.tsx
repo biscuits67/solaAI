@@ -121,7 +121,7 @@ interface Step {
 }
 
 export function Tutorial() {
-  const { tutorialOpen, setTutorialOpen, mode, setSheet, setWalletOpen, setTab } = useUI()
+  const { tutorialOpen, setTutorialOpen, mode, setSheet, setTab } = useUI()
   const [i, setI] = useState(0)
   const [never, setNever] = useState(false)
   const real = mode === 'real'
@@ -174,7 +174,7 @@ export function Tutorial() {
   const finish = () => {
     close()
     setTab('home')
-    setTimeout(() => (real ? setWalletOpen(true) : setSheet('session')), 350)
+    setTimeout(() => setSheet('session'), 350)
   }
 
   return (
@@ -221,9 +221,13 @@ export function Tutorial() {
                     Back
                   </button>
                 )}
-                <button className="btn btn-primary" onClick={() => (last ? finish() : setI(i + 1))}>
-                  {last ? (real ? 'Connect wallet' : 'Start my first session') : 'Next'}
-                </button>
+                {last && real ? (
+                  <button className="btn btn-primary">Connect</button>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => (last ? finish() : setI(i + 1))}>
+                    {last ? 'Start my first session' : 'Next'}
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

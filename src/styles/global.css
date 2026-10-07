@@ -1504,42 +1504,6 @@ input[type='number'] {
   position: relative;
   z-index: 2;
 }
-.wallet-opt {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  width: 100%;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--line);
-  transition: all 0.35s var(--ease);
-}
-.wallet-opt:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: var(--line-2);
-  transform: translateX(4px);
-}
-.wallet-logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  font-family: var(--f-display);
-  font-weight: 700;
-  font-size: 16px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-}
-.wallet-logo::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.35), transparent 50%);
-}
 
 /* notice banner */
 .notice {
