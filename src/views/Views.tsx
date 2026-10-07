@@ -8,6 +8,7 @@ import { ChartPanel } from '../components/ChartPanel'
 import { NumInput, Range, Segmented } from '../components/Controls'
 import { ActivityRows, BalanceCard, Card, InsightStrip, PositionsCard, PriceCard, SignalHero, useEquity } from '../components/Fintech'
 import { DEFAULT_OVERLAYS, PriceChart } from '../components/PriceChart'
+import { Sol } from '../components/Session'
 import { CrossExchange, Empty } from '../components/TradeWidgets'
 import { EXCHANGES } from '../data/exchanges'
 import { INTERVALS, type Candle, type Interval } from '../data/types'
@@ -105,7 +106,7 @@ export function ActivityView() {
 
 /* ───────────── Performance ───────────── */
 
-function Stat({ label, value, fmt, sub, color, ring, delay = 0 }: { label: string; value: number; fmt: (v: number) => string; sub?: string; color?: string; ring?: number; delay?: number }) {
+function Stat({ label, value, fmt, sub, color, ring, delay = 0, sol }: { label: string; value: number; fmt: (v: number) => string; sub?: string; color?: string; ring?: number; delay?: number; sol?: boolean }) {
   return (
     <Card delay={delay}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -114,6 +115,7 @@ function Stat({ label, value, fmt, sub, color, ring, delay = 0 }: { label: strin
           <div className="big-num" style={{ fontSize: 28, marginTop: 10, color }}>
             <AnimatedNumber value={value} format={fmt} />
           </div>
+          {sol && <Sol usd={value} signed={value < 0} />}
           {sub && (
             <div className="lab" style={{ fontSize: 12, marginTop: 6 }}>
               {sub}
@@ -147,8 +149,8 @@ export function PerformanceView() {
     <div className="fx-page">
       <div className="page-title">Performance</div>
       <div className="fx-grid g4">
-        <Stat label="Balance" value={eq} fmt={(v) => fmtUsd(v)} delay={0.04} />
-        <Stat label="Total profit" value={pnl} fmt={(v) => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`} color={pnl >= 0 ? 'var(--long)' : 'var(--short)'} sub={`${fmtSigned((pnl / START_BALANCE) * 100)}% since start`} delay={0.08} />
+        <Stat label="Balance" value={eq} fmt={(v) => fmtUsd(v)} delay={0.04} sol />
+        <Stat label="Total profit" value={pnl} fmt={(v) => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`} color={pnl >= 0 ? 'var(--long)' : 'var(--short)'} sub={`${fmtSigned((pnl / START_BALANCE) * 100)}% since start`} delay={0.08} sol />
         <Stat label="Winning trades" value={t.history.length ? (wins / t.history.length) * 100 : 0} fmt={(v) => `${v.toFixed(0)}%`} ring={t.history.length ? wins / t.history.length : 0} delay={0.12} />
         <Stat label="Trades made" value={t.history.length} fmt={(v) => v.toFixed(0)} sub={`${t.positions.length} open now`} delay={0.16} />
       </div>
@@ -170,6 +172,9 @@ export function PerformanceView() {
               </div>
               <span className="mono" style={{ textAlign: 'right', color: b.pnl >= 0 ? 'var(--long)' : 'var(--short)' }}>
                 {b.pnl >= 0 ? '+' : '−'}${Math.abs(b.pnl).toFixed(2)}
+                <div>
+                  <Sol usd={b.pnl} signed />
+                </div>
               </span>
             </div>
           ))}

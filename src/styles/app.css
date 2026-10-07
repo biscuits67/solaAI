@@ -1103,3 +1103,344 @@ body {
     text-align: left;
   }
 }
+
+/* ───────── Solana logo (CSS) ───────── */
+.sol-logo {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  position: relative;
+}
+.sol-logo.tile {
+  border-radius: 30%;
+  background: radial-gradient(circle at 30% 20%, #26203f, #0d0b16 70%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 24px -8px rgba(153, 69, 255, 0.7);
+}
+.sol-bars {
+  width: 62%;
+  height: 48%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.sol-logo:not(.tile) .sol-bars {
+  width: 100%;
+  height: 78%;
+}
+.sol-bars i {
+  display: block;
+  height: 22%;
+  background: linear-gradient(90deg, #00ffa3, #03e1ff 45%, #dc1fff);
+}
+.sol-bars .b1,
+.sol-bars .b3 {
+  clip-path: polygon(20% 0, 100% 0, 80% 100%, 0 100%);
+}
+.sol-bars .b2 {
+  clip-path: polygon(0 0, 80% 0, 100% 100%, 20% 100%);
+}
+.sol-bars .b1 {
+  background: linear-gradient(90deg, #19d9d0, #8a5bff 60%, #dc1fff);
+}
+.sol-bars .b2 {
+  background: linear-gradient(90deg, #0bf0b8, #3fb3f5 55%, #a33cff);
+}
+.sol-bars .b3 {
+  background: linear-gradient(90deg, #00ffa3, #12d7d8 50%, #6a7dff);
+}
+.welcome-logo {
+  filter: drop-shadow(0 10px 30px rgba(153, 69, 255, 0.45));
+  animation: logoFloat 5s ease-in-out infinite;
+}
+@keyframes logoFloat {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ───────── sessions ───────── */
+.sol-hint {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.sol-hint.on-dark {
+  color: rgba(255, 255, 255, 0.7);
+}
+.opt .dur {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--card-3);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  flex: none;
+  line-height: 1;
+}
+.opt.on .dur {
+  background: var(--violet);
+}
+.opt .dur b {
+  font-family: var(--f-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+.opt .dur span {
+  font-size: 10px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.mini-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.18);
+  color: var(--violet-2);
+  margin-left: 6px;
+}
+.sess-live {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.sess-ring {
+  --k: 0;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#fff calc(var(--k) * 360deg), rgba(255, 255, 255, 0.2) 0);
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.25);
+}
+.sess-ring span {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 20, 70, 0.85);
+  font-family: var(--f-mono);
+  font-size: 14px;
+  font-weight: 600;
+}
+.sheet.result {
+  width: 480px;
+}
+.result-glow {
+  position: absolute;
+  left: 50%;
+  top: -160px;
+  width: 520px;
+  height: 320px;
+  margin-left: -260px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  z-index: 1;
+}
+.result-glow.up {
+  background: radial-gradient(closest-side, #14f195, transparent);
+}
+.result-glow.down {
+  background: radial-gradient(closest-side, #ff5f87, transparent);
+}
+.res-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--stroke);
+}
+.res-grid b {
+  display: block;
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: 17px;
+  margin-top: 4px;
+}
+
+/* ───────── tutorial ───────── */
+.modal.tut {
+  width: min(520px, 100%);
+  padding: 30px;
+}
+.tut-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.tut-art {
+  height: 220px;
+  border-radius: 24px;
+  background: radial-gradient(400px 220px at 50% 0%, rgba(124, 92, 255, 0.22), transparent 70%), rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+.tut-card {
+  width: 100%;
+  max-width: 330px;
+  background: var(--card);
+  border: 1px solid var(--stroke-2);
+  border-radius: 22px;
+  padding: 18px 20px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+}
+.tut-card.sig-card {
+  border: 0;
+  color: #fff;
+}
+.tut-acts {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.tut-acts span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.tut-acts i {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--card-3);
+}
+.tut-acts .hl {
+  color: var(--ink);
+}
+.tut-acts .hl i {
+  background: var(--violet);
+  box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.7);
+  animation: vping 1.4s var(--ease) infinite;
+}
+.tut-dur {
+  flex: 1;
+  padding: 12px 0;
+  border-radius: 16px;
+  background: var(--card-3);
+  display: grid;
+  place-items: center;
+  line-height: 1.1;
+}
+.tut-dur b {
+  font-family: var(--f-display);
+  font-size: 22px;
+}
+.tut-dur span {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.tut-dur.on {
+  background: var(--violet);
+  box-shadow: 0 10px 24px -8px var(--violet);
+}
+.tut-dur.on span {
+  color: #fff;
+}
+.tut-btn {
+  margin-top: 14px;
+  text-align: center;
+  padding: 12px;
+  border-radius: 999px;
+  background: var(--violet);
+  font-weight: 700;
+  font-size: 13px;
+  animation: pulseBtn 2s ease-in-out infinite;
+}
+@keyframes pulseBtn {
+  50% {
+    box-shadow: 0 0 0 8px rgba(124, 92, 255, 0.15);
+  }
+}
+.tut-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 52px;
+  margin-top: 12px;
+}
+.tut-bars i {
+  flex: 1;
+  border-radius: 4px;
+  background: linear-gradient(#14f195, rgba(20, 241, 149, 0.25));
+}
+.tut-rings {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.tut-rings i {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid rgba(124, 92, 255, 0.5);
+  animation: ringOut 3s var(--ease) infinite;
+}
+.tut-rings i:nth-child(2) {
+  animation-delay: 1s;
+}
+.tut-rings i:nth-child(3) {
+  animation-delay: 2s;
+}
+@keyframes ringOut {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.tut-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin: 22px 0 18px;
+}
+.tut-dots button {
+  width: 8px;
+  height: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: all 0.4s var(--ease);
+}
+.tut-dots button.on {
+  width: 26px;
+  background: linear-gradient(90deg, #14f195, #7c5cff);
+}
+.tut-dots button.done {
+  background: rgba(20, 241, 149, 0.6);
+}
+.tut-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

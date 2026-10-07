@@ -15,7 +15,8 @@ interface UIState {
   mode: Mode
   tab: Tab
   walletOpen: boolean
-  sheet: null | 'buy' | 'sell' | 'settings'
+  sheet: null | 'buy' | 'sell' | 'settings' | 'session'
+  tutorialOpen: boolean
   welcomeOpen: boolean
   welcomeStep: 'choose' | 'warn'
   toasts: Toast[]
@@ -23,6 +24,7 @@ interface UIState {
   setTab: (t: Tab) => void
   setWalletOpen: (v: boolean) => void
   setSheet: (s: UIState['sheet']) => void
+  setTutorialOpen: (v: boolean) => void
   setWelcomeOpen: (v: boolean, step?: 'choose' | 'warn') => void
   dismiss: (id: number) => void
 }
@@ -45,6 +47,7 @@ export const useUI = create<UIState>((set) => ({
   tab: (['home', 'activity', 'performance', 'how'] as Tab[]).includes(read<Tab>('sola.tab', 'home')) ? read<Tab>('sola.tab', 'home') : 'home',
   walletOpen: false,
   sheet: null,
+  tutorialOpen: false,
   welcomeOpen: true,
   welcomeStep: 'choose',
   toasts: [],
@@ -59,6 +62,7 @@ export const useUI = create<UIState>((set) => ({
   },
   setWalletOpen: (walletOpen) => set({ walletOpen }),
   setSheet: (sheet) => set({ sheet }),
+  setTutorialOpen: (tutorialOpen) => set({ tutorialOpen }),
   setWelcomeOpen: (welcomeOpen, welcomeStep = 'choose') => set({ welcomeOpen, welcomeStep }),
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))

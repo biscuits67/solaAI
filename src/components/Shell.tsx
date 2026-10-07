@@ -4,6 +4,7 @@ import { EXCHANGES } from '../data/exchanges'
 import type { ExchangeId } from '../data/types'
 import { useMarket } from '../store/market'
 import { useUI, type Mode } from '../store/ui'
+import { SolanaLogo } from './SolanaLogo'
 
 export const MIN_REAL_USD = 50
 
@@ -90,7 +91,7 @@ export function ModeSwitch() {
 /* ───────────── Welcome: demo notice + mode choice ───────────── */
 
 export function WelcomeModal() {
-  const { welcomeOpen, welcomeStep, setWelcomeOpen, setMode, setWalletOpen } = useUI()
+  const { welcomeOpen, welcomeStep, setWelcomeOpen, setMode, setTutorialOpen } = useUI()
   const [step, setStep] = useState<'choose' | 'warn'>(welcomeStep)
   const [agree, setAgree] = useState(false)
   useEffect(() => {
@@ -98,14 +99,22 @@ export function WelcomeModal() {
     setAgree(false)
   }, [welcomeOpen, welcomeStep])
 
+  const tutorial = () => {
+    let skip = false
+    try {
+      skip = localStorage.getItem('sola.tutorial.skip') === '1'
+    } catch {}
+    if (!skip) setTimeout(() => setTutorialOpen(true), 380)
+  }
   const stayDemo = () => {
     setMode('demo')
     setWelcomeOpen(false)
+    tutorial()
   }
   const goReal = () => {
     setMode('real')
     setWelcomeOpen(false)
-    setTimeout(() => setWalletOpen(true), 450)
+    tutorial()
   }
 
   return (
@@ -123,7 +132,7 @@ export function WelcomeModal() {
               {step === 'choose' ? (
                 <motion.div key="choose" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
                   <div className="welcome-head">
-                    <div className="orb" style={{ width: 64, height: 64 }} />
+                    <span className="welcome-logo"><SolanaLogo size={64} /></span>
                     <div className="demo-pill choose">
                       <span className="live-dot" /> SELECT A MODE
                     </div>

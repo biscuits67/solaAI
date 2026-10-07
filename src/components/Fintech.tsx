@@ -12,6 +12,9 @@ import { toast, useUI, type Tab } from '../store/ui'
 import { AnimatedNumber } from './AnimatedNumber'
 import { PriceLine } from './canvas'
 import { MIN_REAL_USD, ModeSwitch, VenuePicker } from './Shell'
+import { SolanaLogo } from './SolanaLogo'
+import { SessionLive, SessionSheet, Sol } from './Session'
+import { useSession } from '../store/session'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -65,7 +68,7 @@ export function Header() {
   return (
     <motion.header className="fx-top" initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: EASE }}>
       <div className="fx-logo">
-        <div className="sq" />
+        <SolanaLogo size={36} />
         Solana AI
       </div>
       <nav className="fx-nav">
@@ -129,6 +132,9 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
   const eq = useEquity()
   const pnl = eq - START_BALANCE
   const guard = useGuard()
+  const session = useSession()
+  const running = (!!session.active || bot.enabled) && mode === 'demo'
+  const startStop = () => (running ? (session.active ? session.stop() : bot.toggle()) : guard(() => setSheet('session')))
   const whole = Math.floor(eq)
   const cents = Math.round((eq - whole) * 100)
 
@@ -141,10 +147,12 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
             <AnimatedNumber value={whole} format={(v) => `$${Math.round(v).toLocaleString('en-US')}`} />
             <small>.{String(cents).padStart(2, '0')}</small>
           </div>
-          <div style={{ marginTop: 12 }}>
+          <Sol usd={eq} />
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span className={pnl >= 0 ? 'chip-up' : 'chip-down'}>
               {fmtSigned(pnl)} $ · {fmtSigned((pnl / START_BALANCE) * 100)}%
             </span>
+            <Sol usd={pnl} signed />
           </div>
         </>
       ) : (
@@ -159,9 +167,9 @@ export function BalanceCard({ delay = 0 }: { delay?: number }) {
       )}
 
       <div className="acts">
-        <button className={`act main ${bot.enabled && mode === 'demo' ? 'running' : ''}`} onClick={() => guard(() => bot.toggle())}>
-          <span className="ic">{bot.enabled && mode === 'demo' ? <i className="g-stop" /> : <i className="g-play" />}</span>
-          {bot.enabled && mode === 'demo' ? 'Stop AI' : 'Start AI'}
+        <button className={`act main ${running ? 'running' : ''}`} onClick={startStop}>
+          <span className="ic">{running ? <i className="g-stop" /> : <i className="g-play" />}</span>
+          {running ? 'Stop AI' : 'Start AI'}
         </button>
         <button className="act" onClick={() => guard(() => setSheet('buy'))}>
           <span className="ic">
@@ -264,6 +272,9 @@ export function ActivityRows({ limit = 50 }: { limit?: number }) {
             {a.amount != null && (
               <div className="ra" style={{ color: a.amount >= 0 ? 'var(--long)' : 'var(--short)' }}>
                 {a.amount >= 0 ? '+' : '−'}${Math.abs(a.amount).toFixed(2)}
+                <div>
+                  <Sol usd={a.amount} signed />
+                </div>
               </div>
             )}
           </motion.div>
@@ -283,7 +294,9 @@ export function SignalHero({ delay = 0 }: { delay?: number }) {
   const guard = useGuard()
   const dir = signal?.direction ?? 'NEUTRAL'
   const segs = signal ? Math.max(1, Math.round(signal.confidence / 20)) : 0
-  const running = bot.enabled && mode === 'demo'
+  const session = useSession()
+  const running = (!!session.active || bot.enabled) && mode === 'demo'
+  const setSheet = useUI((s) => s.setSheet)
 
   return (
     <Card className={`sig-card ${dir}`} delay={delay}>
@@ -311,8 +324,11 @@ export function SignalHero({ delay = 0 }: { delay?: number }) {
       <div style={{ fontSize: 12.5, marginTop: 8, color: 'rgba(255,255,255,0.8)' }}>
         {signal ? `Confidence ${signal.confidence}% · ${confidenceWord(signal.confidence)}` : '—'}
       </div>
+      {session.active && mode === 'demo' ? (
+        <SessionLive />
+      ) : (
       <div className="sig-actions">
-        <button className={`btn-white ${running ? 'stop' : ''}`} onClick={() => guard(() => bot.toggle())}>
+        <button className={`btn-white ${running ? 'stop' : ''}`} onClick={() => (running ? bot.toggle() : guard(() => setSheet('session')))}>
           {running ? (
             <>
               <i className="g-stop" style={{ width: 11, height: 11 }} /> Stop AI trading
@@ -327,6 +343,7 @@ export function SignalHero({ delay = 0 }: { delay?: number }) {
           </span>
         )}
       </div>
+      )}
     </Card>
   )
 }
@@ -461,6 +478,9 @@ export function PositionsCard({ delay = 0 }: { delay?: number }) {
               </div>
               <div className="ra" style={{ color: pnl >= 0 ? 'var(--long)' : 'var(--short)' }}>
                 {pnl >= 0 ? '+' : '−'}${Math.abs(pnl).toFixed(2)}
+                <div>
+                  <Sol usd={pnl} signed />
+                </div>
               </div>
               <button className="btn-dark" style={{ padding: '10px 16px', fontSize: 13 }} onClick={() => closePosition(p.id, price)}>
                 Close
@@ -500,7 +520,7 @@ export function Sheets() {
             exit={{ opacity: 0, y: 30, scale: 0.97 }}
             transition={{ duration: 0.45, ease: EASE }}
           >
-            {sheet === 'settings' ? <SettingsSheet /> : <TradeSheet side={sheet === 'buy' ? 'long' : 'short'} />}
+            {sheet === 'settings' ? <SettingsSheet /> : sheet === 'session' ? <SessionSheet /> : <TradeSheet side={sheet === 'buy' ? 'long' : 'short'} />}
           </motion.div>
         </motion.div>
       )}
@@ -542,7 +562,7 @@ function TradeSheet({ side }: { side: Side }) {
         <input value={amt} style={{ width: `${Math.max(1, amt.length) * 0.78}em` }} inputMode="decimal" onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} autoFocus />
       </div>
       <div className="lab" style={{ textAlign: 'center' }}>
-        ≈ {size.toFixed(3)} SOL · available {fmtUsd(balance)}
+        ≈ {size.toFixed(3)} SOL{boost > 1 ? ` with ${boost}x boost` : ''} · available {fmtUsd(balance)} <Sol usd={balance} />
       </div>
       <div className="quick">
         {[100, 250, 500, 1000].map((v) => (
@@ -643,6 +663,16 @@ function SettingsSheet() {
       <button
         className="btn-dark"
         style={{ width: '100%', marginTop: 20 }}
+        onClick={() => {
+          setSheet(null)
+          setTimeout(() => useUI.getState().setTutorialOpen(true), 300)
+        }}
+      >
+        Show tutorial again
+      </button>
+      <button
+        className="btn-dark"
+        style={{ width: '100%', marginTop: 8 }}
         onClick={() => {
           if (confirm('Reset the demo balance to $10,000?')) reset()
         }}

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { buildCtx, scoreAt, strategySignal, STRATEGIES, type StrategyId } from '../lib/ai'
 import { useMarket } from './market'
 import { useTrading } from './trading'
+import { useSession } from './session'
 import { think } from './thoughts'
 import { toast } from './ui'
 
@@ -65,7 +66,7 @@ let lastEntryBar = 0
 /** One autopilot evaluation. Called periodically from the app shell. */
 export function botStep() {
   const bot = useBot.getState()
-  if (!bot.enabled) return
+  if (!bot.enabled || useSession.getState().active?.scripted) return
   const { candles, price } = useMarket.getState()
   if (candles.length < 80 || !price) return
   const tr = useTrading.getState()

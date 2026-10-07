@@ -1,7 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect } from 'react'
 import { Header, MobileNav, Sheets } from './components/Fintech'
+import { SessionResult } from './components/Session'
 import { Toasts, WalletModal, WelcomeModal } from './components/Shell'
+import { Tutorial } from './components/Tutorial'
+import { sessionTick } from './store/session'
 import { botStep } from './store/bot'
 import { startFeed, useMarket } from './store/market'
 import { computeSignal, useSignal } from './store/signal'
@@ -22,11 +25,13 @@ export default function App() {
     const sig = setInterval(computeSignal, 1000)
     const thoughts = setInterval(() => thinkTick(useSignal.getState().signal), 1100)
     const bot = setInterval(() => useUI.getState().mode === 'demo' && botStep(), 3000)
+    const sess = setInterval(sessionTick, 500)
     const unsub = useMarket.subscribe((s, p) => s.price !== p.price && useTrading.getState().tick(s.price))
     return () => {
       clearInterval(sig)
       clearInterval(thoughts)
       clearInterval(bot)
+      clearInterval(sess)
       unsub()
     }
   }, [])
@@ -63,6 +68,8 @@ export default function App() {
       <MobileNav />
       <Sheets />
       <WelcomeModal />
+      <Tutorial />
+      <SessionResult />
       <WalletModal />
       <Toasts />
     </>
